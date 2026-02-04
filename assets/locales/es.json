@@ -1,0 +1,64 @@
+{
+  "settings": {
+    "title": "Configuración",
+    "appearance": {
+      "title": "Apariencia",
+      "theme": "Tema",
+      "light": "Claro",
+      "dark": "Oscuro"
+    },
+    "language": {
+      "title": "Idioma",
+      "select": "Seleccionar Idioma",
+      "pt": "Portugués",
+      "en": "Inglés",
+      "es": "Español"
+    },
+    "account": {
+      "title": "Cuenta",
+      "username": "Nombre de Usuario",
+      "email": "Correo Electrónico",
+      "profileImage": "Imagen de Perfil",
+      "changeImage": "Cambiar Imagen"
+    },
+    "security": {
+      "title": "Seguridad",
+      "changePassword": "Cambiar Contraseña",
+      "logout": "Cerrar Sesión"
+    },
+    "privacy": {
+      "title": "Privacidad",
+      "deleteAccount": "Eliminar Cuenta",
+      "deleteConfirm": "¿Estás seguro de que quieres eliminar tu cuenta? Esta acción es irreversible."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenido de Vuelta",
+      "subtitle": "Inicia sesión en tu cuenta",
+      "button": "Iniciar Sesión",
+      "noAccount": "¿No tienes cuenta? Regístrate"
+    },
+    "register": {
+      "title": "Crear Cuenta",
+      "subtitle": "Únete a nosotros hoy",
+      "button": "Registrarse",
+      "hasAccount": "¿Ya tienes cuenta? Iniciar Sesión",
+      "step1": "Información Básica",
+      "step2": "Elegir Tipo de Cuenta",
+      "step3": "Detalles de la Cuenta"
+    },
+    "accountTypes": {
+      "player": "Jugador",
+      "coach": "Entrenador",
+      "scout": "Ojeador"
+    },
+    "fullName": "Nombre Completo",
+    "age": "Edad",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "next": "Siguiente",
+    "back": "Atrás"
+  }
+}

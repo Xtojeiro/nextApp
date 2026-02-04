@@ -1,0 +1,165 @@
+{
+  "settings": {
+    "title": "Definições",
+    "appearance": {
+      "title": "Aparência",
+      "theme": "Tema",
+      "light": "Claro",
+      "dark": "Escuro"
+    },
+    "language": {
+      "title": "Idioma",
+      "select": "Selecionar Idioma",
+      "pt": "Português",
+      "en": "Inglês",
+      "es": "Espanhol"
+    },
+    "account": {
+      "title": "Conta",
+      "username": "Nome de Utilizador",
+      "email": "Email",
+      "profileImage": "Imagem de Perfil",
+      "changeImage": "Alterar Imagem"
+    },
+    "security": {
+      "title": "Segurança",
+      "changePassword": "Alterar Palavra-passe",
+      "logout": "Terminar Sessão"
+    },
+    "privacy": {
+      "title": "Privacidade",
+      "deleteAccount": "Apagar Conta",
+      "deleteConfirm": "Tem certeza que deseja apagar a sua conta? Esta ação é irreversível."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bem-vindo de Volta",
+      "subtitle": "Entre na sua conta",
+      "button": "Entrar",
+      "noAccount": "Não tem conta? Registar-se"
+    },
+    "register": {
+      "title": "Criar Conta",
+      "subtitle": "Junte-se a nós hoje",
+      "button": "Registar",
+      "hasAccount": "Já tem conta? Entrar"
+    },
+    "fullName": "Nome Completo",
+    "email": "Email",
+    "password": "Palavra-passe",
+    "confirmPassword": "Confirmar Palavra-passe"
+  },
+  "tabs": {
+    "dashboard": "Dashboard",
+    "feed": "Feed",
+    "treinos": "Treinos",
+    "messages": "Mensagens",
+    "profile": "Perfil",
+    "equipa": "Equipa"
+  },
+  "feed": {
+    "title": "Feed",
+    "subtitle": "Últimas atualizações do clube"
+  },
+  "treinos": {
+    "title": "Treinos",
+    "subtitle": "Gerenciar e visualizar sessões de treino",
+    "newWorkout": "Novo Treino",
+    "search": "Pesquisar por nome",
+    "filterType": "Tipo de treino",
+    "filterDate": "Data",
+    "gym": "Ginásio",
+    "football": "Futebol",
+    "planned": "Por fazer",
+    "inProgress": "Em curso",
+    "completed": "Concluído",
+    "startWorkout": "Iniciar treino",
+    "duration": "Duração",
+    "objective": "Objetivo",
+    "timer": "Cronómetro",
+    "finishWorkout": "Finalizar Treino",
+    "type": "Tipo de Treino",
+    "exercisesDone": "Exercícios realizados",
+    "sets": "Séries",
+    "reps": "Repetições",
+    "weight": "Peso (kg)",
+    "rpe": "RPE / Intensidade percebida",
+    "totalTime": "Tempo total",
+    "muscleSensation": "Sensação muscular",
+    "light": "Leve",
+    "normal": "Normal",
+    "fatigue": "Fadiga",
+    "sessionType": "Tipo de sessão",
+    "technical": "Técnico",
+    "tactical": "Tático",
+    "physical": "Físico",
+    "game": "Jogo",
+    "distance": "Distância percorrida (km)",
+    "intensity": "Intensidade",
+    "low": "Baixa",
+    "medium": "Média",
+    "high": "Alta",
+    "playedGame": "Participação em jogo",
+    "yes": "Sim",
+    "no": "Não",
+    "position": "Posição em campo",
+    "physicalSensation": "Sensação física geral",
+    "notes": "Observações",
+    "submit": "Submeter"
+  },
+  "profile": {
+    "title": "Perfil",
+    "editProfile": "Editar Perfil",
+    "followers": "Seguidores",
+    "following": "Seguindo",
+    "bio": "Bio",
+    "name": "Nome",
+    "profilePicture": "Foto de Perfil",
+    "changePicture": "Alterar Foto",
+    "save": "Salvar",
+    "cancel": "Cancelar"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Visão geral da sua atividade desportiva",
+    "activityHeatmap": "Mapa de Atividade",
+    "calendar": "Calendário",
+    "totalActivities": "Atividades Totais",
+    "thisMonth": "Este Mês",
+    "thisWeek": "Esta Semana",
+    "streak": "Sequência",
+    "days": "dias",
+    "noActivity": "Sem atividade",
+    "lowActivity": "Atividade baixa",
+    "mediumActivity": "Atividade média",
+    "highActivity": "Atividade alta",
+    "training": "Treino",
+    "game": "Jogo",
+    "medical": "Exame Médico",
+    "addEvent": "Adicionar Evento",
+    "eventDetails": "Detalhes do Evento",
+    "date": "Data",
+    "time": "Hora",
+    "location": "Local",
+    "notes": "Notas",
+    "create": "Criar",
+    "update": "Atualizar",
+    "delete": "Apagar",
+    "confirmDelete": "Tem certeza que deseja apagar este evento?",
+    "monthView": "Vista Mensal",
+    "weekView": "Vista Semanal",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "tomorrow": "Amanhã"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "delete": "Apagar",
+    "edit": "Editar",
+    "save": "Salvar",
+    "cancel": "Cancelar"
+  }
+}

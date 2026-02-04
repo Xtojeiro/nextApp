@@ -1,0 +1,176 @@
+{
+  "settings": {
+    "title": "Settings",
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": {
+      "title": "Language",
+      "select": "Select Language",
+      "pt": "Portuguese",
+      "en": "English",
+      "es": "Spanish"
+    },
+    "account": {
+      "title": "Account",
+      "username": "Username",
+      "email": "Email",
+      "profileImage": "Profile Image",
+      "changeImage": "Change Image"
+    },
+    "security": {
+      "title": "Security",
+      "changePassword": "Change Password",
+      "logout": "Logout"
+    },
+    "privacy": {
+      "title": "Privacy",
+      "deleteAccount": "Delete Account",
+      "deleteConfirm": "Are you sure you want to delete your account? This action is irreversible."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome Back",
+      "subtitle": "Sign in to your account",
+      "button": "Sign In",
+      "noAccount": "Don't have an account? Sign Up"
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Join us today",
+      "button": "Sign Up",
+      "hasAccount": "Already have an account? Sign In",
+      "step1": "Basic Information",
+      "step2": "Choose Account Type",
+      "step3": "Account Details"
+    },
+    "accountTypes": {
+      "player": "Player",
+      "coach": "Coach",
+      "scout": "Scout"
+    },
+    "fullName": "Full Name",
+    "age": "Age",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "next": "Next",
+    "back": "Back"
+  },
+  "tabs": {
+    "dashboard": "Dashboard",
+    "feed": "Feed",
+    "treinos": "Treinos",
+    "messages": "Messages",
+    "profile": "Profile",
+    "equipa": "Team"
+  },
+  "feed": {
+    "title": "Feed",
+    "subtitle": "Latest updates from the club"
+  },
+  "treinos": {
+    "title": "Treinos",
+    "subtitle": "Manage and view training sessions",
+    "newWorkout": "New Workout",
+    "search": "Search by name",
+    "filterType": "Workout type",
+    "filterDate": "Date",
+    "gym": "Gym",
+    "football": "Football",
+    "planned": "Planned",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "startWorkout": "Start Workout",
+    "duration": "Duration",
+    "objective": "Objective",
+    "timer": "Timer",
+    "finishWorkout": "Finish Workout",
+    "type": "Workout Type",
+    "exercisesDone": "Exercises Done",
+    "sets": "Sets",
+    "reps": "Reps",
+    "weight": "Weight (kg)",
+    "rpe": "RPE / Perceived Intensity",
+    "totalTime": "Total Time",
+    "muscleSensation": "Muscle Sensation",
+    "light": "Light",
+    "normal": "Normal",
+    "fatigue": "Fatigue",
+    "sessionType": "Session Type",
+    "technical": "Technical",
+    "tactical": "Tactical",
+    "physical": "Physical",
+    "game": "Game",
+    "distance": "Distance Covered (km)",
+    "intensity": "Intensity",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "playedGame": "Played in Game",
+    "yes": "Yes",
+    "no": "No",
+    "position": "Field Position",
+    "physicalSensation": "Overall Physical Sensation",
+    "notes": "Notes",
+    "submit": "Submit"
+  },
+  "profile": {
+    "title": "Perfil",
+    "editProfile": "Edit Profile",
+    "followers": "Followers",
+    "following": "Following",
+    "bio": "Bio",
+    "name": "Name",
+    "profilePicture": "Profile Picture",
+    "changePicture": "Change Picture",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your sports activity",
+    "activityHeatmap": "Activity Heatmap",
+    "calendar": "Calendar",
+    "totalActivities": "Total Activities",
+    "thisMonth": "This Month",
+    "thisWeek": "This Week",
+    "streak": "Streak",
+    "days": "days",
+    "noActivity": "No activity",
+    "lowActivity": "Low activity",
+    "mediumActivity": "Medium activity",
+    "highActivity": "High activity",
+    "training": "Training",
+    "game": "Game",
+    "medical": "Medical Exam",
+    "addEvent": "Add Event",
+    "eventDetails": "Event Details",
+    "date": "Date",
+    "time": "Time",
+    "location": "Location",
+    "notes": "Notes",
+    "create": "Create",
+    "update": "Update",
+    "delete": "Delete",
+    "confirmDelete": "Are you sure you want to delete this event?",
+    "monthView": "Month View",
+    "weekView": "Week View",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}
