@@ -1,4 +1,4 @@
-# 📋 Tarefas do Projeto - Atualizado 27/01/2026
+# 📋 Tarefas do Projeto - Atualizado 06/02/2026
 
 > **Legenda:**
 > - `[ ]` - Por fazer
@@ -7,14 +7,50 @@
 
 ---
 
-## 🔴 PROBLEMA CRÍTICO DESCOBERTO
+## ✅ PROBLEMA CRÍTICO: Resolvido (24 → 0 erros)
 
-O diretório `convex` atual (`nextapp/convex/`) contém **apenas o template inicial**:
-- `schema.ts` - Só define tabela `numbers` de exemplo
-- `myFunctions.ts` - Funções de exemplo
-- `auth.config.ts` - Configuração WorkOS (OK)
+O backend Convex tem **0 erros de compilação** após as correções!
 
-**O frontend referencia 42+ funções que NÃO EXISTEM!**
+### Correções Aplicadas:
+1. ✅ Campos renomeados no schema vs código: `full_name`, `user_id`, `duration_minutes`
+2. ✅ Roles com case correto: `"PLAYER" | "COACH" | "SCOUT"`
+3. ✅ Campos adicionados ao schema: `is_public`, `description`, `scheduledDate`, `difficulty`
+4. ✅ Campos removidos/ajustados: `updatedAt`, `exercises`, `isPublic`
+
+---
+
+## 🔴 TAREFA URGENTE: Corrigir Erros TypeScript
+
+### games.ts
+- [x] Linha 70: Mudar `creator.name` → `creator.full_name`
+- [x] Linha 227: Mudar `'coach'` → `'COACH'`
+- [x] Linha 236: Mudar `'athlete'` → `'PLAYER'`
+
+### users.ts
+- [x] Linhas 199-204: Adicionar campo `is_public` ao schema e usar em toggle
+- [x] Linha 235: Remover uso do índice `by_public` (não existe) - removida funcionalidade
+- [x] Linha 241: Mudar `user.name` → `user.full_name`
+- [x] Linhas 266, 320, 372: Mudar `'coach'` → `'COACH'`
+- [x] Linha 397: Converter date para string ISO
+- [x] Linha 398: Mudar `'userId'` → `'user_id'`
+
+### workouts.ts
+- [x] Linhas 30, 37, 78: Mudar `userId` → `user_id`
+- [x] Linhas 115, 158: Mudar `workout.userId` → `workout.user_id`
+- [x] Linhas 121, 167: Remover `updatedAt` (não existe no schema)
+- [x] Linha 175: Mudar `workout.duration` → `workout.duration_minutes`
+- [x] Linha 176: Remover `workout.exercises` (não existe no schema)
+
+### schema.ts (Opcional)
+- [x] Adicionar `is_public: v.optional(v.boolean())` à tabela `users`
+- [x] Adicionar índice `.index("by_public", ["is_public"])` (removido, não usado)
+- [x] Adicionar campos `description`, `scheduledDate`, `difficulty` à tabela `workouts`
+
+---
+
+## 🟡 PROBLEMA ANTERIOR (RESOLVIDO)
+
+O schema e módulos básicos já foram criados e o código está agora consistente com o schema.
 
 ---
 
@@ -171,7 +207,7 @@ O diretório `convex` atual (`nextapp/convex/`) contém **apenas o template inic
 
 | Fase | Descrição | Tarefas | Concluídas |
 |---|---|---|---|
-| Fase 0 | Backend Convex | 42 | 0 |
+| Fase 0 | Backend Convex | 42 | 13 |
 | Fase 1 | Atleta | 2 | 0 |
 | Fase 2 | Treinador | 5 | 0 |
 | Fase 3 | Olheiro | 8 | 0 |
@@ -179,8 +215,8 @@ O diretório `convex` atual (`nextapp/convex/`) contém **apenas o template inic
 | Fase 5 | Avançadas | 3 | 0 |
 
 **Total:** ~65 tarefas  
-**Concluídas:** 0  
-**Progresso:** 0%
+**Concluídas:** 13  
+**Progresso:** 20%
 
 ---
 

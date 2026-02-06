@@ -67,7 +67,7 @@ export const getGames = query({
           team2,
           creator: creator ? {
             _id: creator._id,
-            name: creator.name,
+            full_name: creator.full_name,
           } : null,
         };
       })
@@ -224,7 +224,7 @@ export const getMyTeamGames = query({
     // Get teams the user is associated with
     let userTeams: string[] = [];
 
-    if (user.role === 'coach') {
+    if (user.role === 'COACH') {
       const coachProfile = await ctx.db
         .query('coaches')
         .withIndex('by_userId', (q) => q.eq('userId', user._id))
@@ -233,7 +233,7 @@ export const getMyTeamGames = query({
       if (coachProfile?.teamId) {
         userTeams.push(coachProfile.teamId);
       }
-    } else if (user.role === 'athlete') {
+    } else if (user.role === 'PLAYER') {
       const playerProfile = await ctx.db
         .query('players')
         .withIndex('by_userId', (q) => q.eq('userId', user._id))

@@ -27,14 +27,14 @@ export const getWorkouts = query({
       workouts = await ctx.db
         .query('workouts')
         .filter((q) => 
-          q.and(q.eq(q.field('userId'), user._id), q.eq(q.field('status'), args.status))
+          q.and(q.eq(q.field('user_id'), user._id), q.eq(q.field('status'), args.status))
         )
         .order('desc')
         .take(args.limit || 50);
     } else {
       workouts = await ctx.db
         .query('workouts')
-        .filter((q) => q.eq(q.field('userId'), user._id))
+        .filter((q) => q.eq(q.field('user_id'), user._id))
         .order('desc')
         .take(args.limit || 50);
     }
@@ -75,16 +75,16 @@ export const createWorkout = mutation({
 
     const now = Date.now();
     const workoutId = await ctx.db.insert('workouts', {
-      userId: user._id,
+      user_id: user._id,
       name: args.name,
       description: args.description,
-      exercises: args.exercises,
+      type: 'custom',
+      duration_minutes: args.duration,
+      objective: args.description,
       scheduledDate: args.scheduledDate,
-      duration: args.duration,
       difficulty: args.difficulty,
       status: args.scheduledDate ? 'scheduled' : 'in_progress',
-      createdAt: now,
-      updatedAt: now,
+      created_at: now,
     });
 
     return workoutId;
@@ -112,13 +112,12 @@ export const startWorkout = mutation({
       .withIndex('by_email', (q) => q.eq('email', identity.email!))
       .first();
 
-    if (!user || workout.userId !== user._id) {
+    if (!user || workout.user_id !== user._id) {
       throw new Error('Not authorized');
     }
 
     await ctx.db.patch(args.workoutId, {
       status: 'in_progress',
-      updatedAt: Date.now(),
     });
 
     return { success: true };
@@ -155,25 +154,22 @@ export const completeWorkout = mutation({
       .withIndex('by_email', (q) => q.eq('email', identity.email!))
       .first();
 
-    if (!user || workout.userId !== user._id) {
+    if (!user || workout.user_id !== user._id) {
       throw new Error('Not authorized');
     }
 
     const completedDate = Date.now();
 
-    // Update workout status
     await ctx.db.patch(args.workoutId, {
       status: 'completed',
-      updatedAt: completedDate,
     });
 
-    // Create workout log
     await ctx.db.insert('workoutLogs', {
       userId: user._id,
       workoutId: args.workoutId,
       completedDate,
-      duration: args.actualDuration || workout.duration || 0,
-      exercises: args.exercises || workout.exercises,
+      duration: args.actualDuration || workout.duration_minutes || 0,
+      exercises: args.exercises || [],
       notes: args.notes,
     });
 
