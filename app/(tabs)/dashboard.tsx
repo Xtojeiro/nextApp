@@ -1132,9 +1132,9 @@ export default function Dashboard() {
   const { user } = useAuth();
   const convexUser = useQuery(api.users.getCurrentUser);
 
-  const workoutLogs = useQuery(api.workouts.getWorkoutLogs) || [];
-  const events = useQuery(api.events.getEvents, {}) || [];
-  const playerStats = useQuery(api.users.getPlayerStats) || {
+  const workoutLogs = useQuery(api.workouts.getWorkoutLogs, convexUser ? {} : "skip") || [];
+  const events = useQuery(api.events.getEvents, convexUser ? {} : "skip") || [];
+  const playerStats = useQuery(api.users.getPlayerStats, convexUser ? {} : "skip") || {
     totalWorkouts: 0,
     totalGames: 0,
     weeklyFrequency: 0,
@@ -1142,7 +1142,7 @@ export default function Dashboard() {
     currentStreak: 0,
     bestStreak: 0,
   };
-  const coachDashboard = useQuery(api.users.getCoachDashboard) || {
+  const coachDashboard = useQuery(api.users.getCoachDashboard, convexUser?.role === "COACH" ? {} : "skip") || {
     totalAthletes: 0,
     activeAthletes: 0,
     inactiveAthletes: 0,
@@ -1151,7 +1151,7 @@ export default function Dashboard() {
     upcomingGames: 0,
     lowActivityAlerts: 0,
   };
-  const teamAthletes = useQuery(api.users.getTeamAthletes) || [];
+  const teamAthletes = useQuery(api.users.getTeamAthletes, convexUser?.role === "COACH" ? {} : "skip") || [];
   const createEventMutation = useMutation(api.events.createEvent);
   const updateEventMutation = useMutation(api.events.updateEvent);
   const deleteEventMutation = useMutation(api.events.deleteEvent);

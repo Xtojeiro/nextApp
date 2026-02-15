@@ -70,6 +70,7 @@ export default function Register() {
         age: parseInt(age),
         email,
         password,
+        confirmPassword,
         role: roleMap[accountType!],
       });
 

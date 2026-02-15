@@ -12,7 +12,7 @@ export const getPosts = query({
     let posts = await ctx.db.query("posts").collect();
 
     if (args.userId) {
-      posts = posts.filter((p) => p.user_id === args.userId!.toString());
+      posts = posts.filter((p) => p.user_id === args.userId);
     }
 
     posts.sort((a, b) => b.created_at - a.created_at);
@@ -46,13 +46,13 @@ export const getFeed = query({
 
     const following = await ctx.db
       .query("follows")
-      .filter((q) => q.eq(q.field("follower_id"), currentUser._id.toString()))
+      .filter((q) => q.eq(q.field("follower_id"), currentUser._id))
       .collect();
 
     const followingIds = following.map((f) => f.following_id);
 
     const feedPosts = publicPosts.filter(
-      (p) => followingIds.includes(p.user_id) || p.user_id === currentUser._id.toString(),
+      (p) => followingIds.includes(p.user_id) || p.user_id === currentUser._id,
     );
 
     feedPosts.sort((a, b) => b.created_at - a.created_at);
@@ -82,7 +82,7 @@ export const createPost = mutation({
     }
 
     const postId = await ctx.db.insert("posts", {
-      user_id: user._id.toString(),
+      user_id: user._id,
       content: args.content,
       image_url: args.imageUrl,
       likes: [],
@@ -119,7 +119,7 @@ export const deletePost = mutation({
       throw new Error("Post not found");
     }
 
-    if (post.user_id !== user._id.toString()) {
+    if (post.user_id !== user._id) {
       throw new Error("Not authorized to delete this post");
     }
 
@@ -153,7 +153,7 @@ export const likePost = mutation({
     }
 
     const likes = post.likes || [];
-    const userId = user._id.toString();
+    const userId = user._id;
 
     if (likes.includes(userId)) {
       await ctx.db.patch(args.postId, {
@@ -196,7 +196,7 @@ export const addComment = mutation({
 
     const comments = post.comments || [];
     comments.push({
-      user_id: user._id.toString(),
+      user_id: user._id,
       content: args.content,
       timestamp: Date.now(),
     });

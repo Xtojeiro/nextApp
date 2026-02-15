@@ -9,7 +9,7 @@ export const getConversations = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const user = await ctx.db
@@ -18,7 +18,7 @@ export const getConversations = query({
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     // Get conversations where user is a participant
@@ -355,7 +355,7 @@ export const getBlockedUsers = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const user = await ctx.db
@@ -364,7 +364,7 @@ export const getBlockedUsers = query({
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     const blockedRelations = await ctx.db

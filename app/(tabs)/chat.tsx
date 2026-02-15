@@ -29,15 +29,12 @@ export default function ChatTab() {
 
   const conversations = useQuery(
     api.chat.getConversations,
-    user ? { userId: user.id as any } : "skip",
+    user ? {} : "skip",
   );
   const messages = useQuery(
     api.chat.getMessages,
-    selectedConversation && user
-      ? {
-          conversationId: selectedConversation.id as any,
-          userId: user.id as any,
-        }
+    selectedConversation
+      ? { conversationId: selectedConversation.id as any }
       : "skip",
   );
   const sendMessage = useMutation(api.chat.sendMessage);
@@ -46,7 +43,7 @@ export default function ChatTab() {
   const unblockUser = useMutation(api.chat.unblockUser);
   const blockedUsers = useQuery(
     api.chat.getBlockedUsers,
-    user ? { userId: user.id as any } : "skip",
+    user ? {} : "skip",
   );
 
   const handleSendMessage = async () => {
@@ -54,8 +51,7 @@ export default function ChatTab() {
 
     try {
       await sendMessage({
-        senderId: user.id as any,
-        receiverId: selectedConversation.otherUserId as any,
+        conversationId: selectedConversation.id as any,
         content: messageText.trim(),
       });
       setMessageText("");
@@ -74,7 +70,6 @@ export default function ChatTab() {
     if (user) {
       markAsRead({
         conversationId: conversation.id as any,
-        userId: user.id as any,
       });
     }
   };
@@ -140,18 +135,16 @@ export default function ChatTab() {
             style={styles.blockButton}
             onPress={async () => {
               const isBlocked = blockedUsers?.some(
-                (b) => b.id === selectedConversation.otherUserId,
+                (b) => b._id === selectedConversation.otherUserId,
               );
               try {
                 if (isBlocked) {
                   await unblockUser({
-                    blockerId: user.id as any,
-                    blockedId: selectedConversation.otherUserId as any,
+                    userId: selectedConversation.otherUserId as any,
                   });
                 } else {
                   await blockUser({
-                    blockerId: user.id as any,
-                    blockedId: selectedConversation.otherUserId as any,
+                    userId: selectedConversation.otherUserId as any,
                   });
                 }
               } catch (error) {

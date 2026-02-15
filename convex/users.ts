@@ -303,12 +303,29 @@ export const toggleProfileVisibility = mutation({
 
 export const getProfileVisibility = query({
   args: {
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
+    let targetUserId = args.userId;
+
+    if (!targetUserId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        return false;
+      }
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+      if (!user) {
+        return false;
+      }
+      targetUserId = user._id;
+    }
+
+    const user = await ctx.db.get(targetUserId);
     if (!user) {
-      throw new Error("User not found");
+      return false;
     }
 
     return user.is_public;
@@ -345,7 +362,7 @@ export const getTeamAthletes = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const coach = await ctx.db
@@ -354,7 +371,7 @@ export const getTeamAthletes = query({
       .first();
 
     if (!coach || coach.role !== "COACH") {
-      throw new Error("Not authorized");
+      return [];
     }
 
     let targetTeamId = args.teamId;
@@ -415,16 +432,33 @@ export const addAthleteNote = mutation({
 
 export const getPlayerStats = query({
   args: {
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    let targetUserId = args.userId;
+
+    if (!targetUserId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
+      }
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+      if (!user) {
+        return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
+      }
+      targetUserId = user._id;
+    }
+
     const player = await ctx.db
       .query("players")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", targetUserId))
       .first();
 
     if (!player) {
-      throw new Error("Player not found");
+      return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
     }
 
     return (
@@ -445,7 +479,7 @@ export const getCoachDashboard = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return { totalAthletes: 0, recentWorkouts: 0, upcomingEvents: 0, athletes: [] };
     }
 
     const coach = await ctx.db
@@ -454,7 +488,7 @@ export const getCoachDashboard = query({
       .first();
 
     if (!coach || coach.role !== "COACH") {
-      throw new Error("Not authorized");
+      return { totalAthletes: 0, recentWorkouts: 0, upcomingEvents: 0, athletes: [] };
     }
 
     const coachProfile = await ctx.db

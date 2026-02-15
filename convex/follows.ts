@@ -1,12 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-interface User {
-  _id: any;
-  full_name: string;
-  avatar?: string;
-}
-
 export const getFollowers = query({
   args: {
     userId: v.id("users"),
@@ -20,12 +14,12 @@ export const getFollowers = query({
 
     const follows = await ctx.db
       .query("follows")
-      .filter((q) => q.eq(q.field("following_id"), args.userId.toString()))
+      .filter((q) => q.eq(q.field("following_id"), args.userId))
       .collect();
 
     const followers = await Promise.all(
       follows.slice(0, args.limit || 50).map(async (follow) => {
-        const followerUser = await ctx.db.get(follow.follower_id as any) as User | null;
+        const followerUser = await ctx.db.get(follow.follower_id);
         return followerUser
           ? {
               _id: followerUser._id,
@@ -66,12 +60,12 @@ export const getFollowing = query({
 
     const following = await ctx.db
       .query("follows")
-      .filter((q) => q.eq(q.field("follower_id"), targetUserId.toString()))
+      .filter((q) => q.eq(q.field("follower_id"), targetUserId))
       .collect();
 
     const followingUsers = await Promise.all(
       following.slice(0, args.limit || 50).map(async (follow) => {
-        const followedUser = await ctx.db.get(follow.following_id as any) as User | null;
+        const followedUser = await ctx.db.get(follow.following_id);
         return followedUser
           ? {
               _id: followedUser._id,
@@ -92,7 +86,7 @@ export const getFollowersCount = query({
   handler: async (ctx, args) => {
     const follows = await ctx.db
       .query("follows")
-      .filter((q) => q.eq(q.field("following_id"), args.userId.toString()))
+      .filter((q) => q.eq(q.field("following_id"), args.userId))
       .collect();
     return follows.length;
   },
@@ -103,7 +97,7 @@ export const getFollowingCount = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return 0;
     }
 
     let targetUserId = args.userId;
@@ -113,14 +107,14 @@ export const getFollowingCount = query({
         .withIndex("by_email", (q) => q.eq("email", identity.email!))
         .first();
       if (!currentUser) {
-        throw new Error("User not found");
+        return 0;
       }
       targetUserId = currentUser._id;
     }
 
     const follows = await ctx.db
       .query("follows")
-      .filter((q) => q.eq(q.field("follower_id"), targetUserId.toString()))
+      .filter((q) => q.eq(q.field("follower_id"), targetUserId))
       .collect();
     return follows.length;
   },
@@ -151,8 +145,8 @@ export const followUser = mutation({
       .query("follows")
       .filter((q) =>
         q.and(
-          q.eq(q.field("follower_id"), follower._id.toString()),
-          q.eq(q.field("following_id"), args.userId.toString()),
+          q.eq(q.field("follower_id"), follower._id),
+          q.eq(q.field("following_id"), args.userId),
         ),
       )
       .first();
@@ -162,8 +156,8 @@ export const followUser = mutation({
     }
 
     await ctx.db.insert("follows", {
-      follower_id: follower._id.toString(),
-      following_id: args.userId.toString(),
+      follower_id: follower._id,
+      following_id: args.userId,
       created_at: Date.now(),
     });
 
@@ -192,8 +186,8 @@ export const unfollowUser = mutation({
       .query("follows")
       .filter((q) =>
         q.and(
-          q.eq(q.field("follower_id"), follower._id.toString()),
-          q.eq(q.field("following_id"), args.userId.toString()),
+          q.eq(q.field("follower_id"), follower._id),
+          q.eq(q.field("following_id"), args.userId),
         ),
       )
       .first();
@@ -228,8 +222,8 @@ export const isFollowing = query({
       .query("follows")
       .filter((q) =>
         q.and(
-          q.eq(q.field("follower_id"), currentUser._id.toString()),
-          q.eq(q.field("following_id"), args.userId.toString()),
+          q.eq(q.field("follower_id"), currentUser._id),
+          q.eq(q.field("following_id"), args.userId),
         ),
       )
       .first();

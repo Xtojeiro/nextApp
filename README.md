@@ -1,4 +1,4 @@
-# 🏀 NextApp - Plataforma de Gestão Desportiva
+# NextApp - Plataforma de Gestão Desportiva
 
 Uma aplicação mobile multiplataforma desenvolvida com **Expo** (React Native) e **Convex** como backend, focada na gestão de equipas desportivas para jogadores, treinadores e olheiros.
 
@@ -60,18 +60,18 @@ NextApp é uma plataforma completa para gestão desportiva que conecta **jogador
 ## 🛠️ Tecnologias
 
 ### Frontend
-| Tecnologia | Versão | Descrição |
-|------------|--------|-----------|
-| **Expo** | ~54.0 | Framework React Native |
-| **React** | 19.1.0 | Biblioteca UI |
-| **React Native** | 0.81.5 | Mobile development |
-| **TypeScript** | ~5.9.2 | Tipagem estática |
-| **Expo Router** | ~6.0 | File-based routing |
+| Tecnologia          | Versão     | Descrição                   |
+|---------------------|------------|-----------------------------|
+| **Expo**            | ~54.0      | Framework React Native      |
+| **React**           | 19.1.0     | Biblioteca UI               |
+| **React Native**    | 0.81.5     | Mobile development          |
+| **TypeScript**      | ~5.9.2     | Tipagem estática            |
+| **Expo Router**     | ~6.0       | File-based routing          |
 
 ### Backend
-| Tecnologia | Versão | Descrição |
-|------------|--------|-----------|
-| **Convex** | ^1.31.6 | Backend-as-a-Service |
+| Tecnologia          | Versão     | Descrição                   |
+|---------------------|------------|-----------------------------|
+| **Convex**          | ^1.31.6    | Backend-as-a-Service        |
 
 ### Bibliotecas Principais
 - `expo-image-picker` - Seleção de imagens
@@ -167,54 +167,45 @@ nextApp/
 
 ---
 
+## Para ultrapassar possiveis erros
+ - depois do login ou logon fazer reset na consola do expo clicando no 'r' 
+ - existem paginas na conta de treinador e olheiro que ainda nao estao no sitio correto, por isso ao abri-las da erro
+   a resolucao e a mesma clicar no 'r' e nao voltar a abrir a pagina
+ - a conta de olheiro ainda nao consegue ser testada
+ - ainda nao esta disponivel a funcionalidade de imagem de perfil
+
+estes sao os erros mais comuns de encontrar e nao estao previstos estarem terminados de acordo com o diagrama de gant enviado anteriormente
+
+
+
+
+
+
 ## ⚙️ Configuração
 
 ### Convex Backend
 O backend utiliza Convex com as seguintes tabelas:
-
-| Tabela | Descrição |
-|--------|-----------|
-| `users` | Utilizadores (jogadores, treinadores, olheiros) |
-| `players` | Dados estendidos de jogadores |
-| `coaches` | Dados estendidos de treinadores |
-| `teams` | Equipas |
-| `workouts` | Treinos |
-| `games` | Jogos |
-| `events` | Eventos de calendário |
-| `trainingPlans` | Planos de treino |
-| `conversations` | Conversas de chat |
-| `messages` | Mensagens |
-| `follows` | Sistema de seguir |
-| `posts` | Publicações |
-
----
-
-## 📜 Scripts Disponíveis
-
-| Script | Comando | Descrição |
-|--------|---------|-----------|
-| Iniciar | `npm start` | Inicia o servidor de desenvolvimento Expo |
-| Android | `npm run android` | Executa no emulador/dispositivo Android |
-| iOS | `npm run ios` | Executa no simulador/dispositivo iOS |
-| Web | `npm run web` | Executa no browser |
-| Lint | `npm run lint` | Verifica erros de código |
-| Reset | `npm run reset-project` | Limpa o projeto para novo início |
-
----
-
-## 📊 Estado do Desenvolvimento
-
-| Área | Estado | Notas |
-|------|--------|-------|
-| **Frontend (UI)** | ✅ 90% | Páginas principais implementadas |
-| **Backend Convex** | 🟡 Em progresso | Schema e funções base criadas |
-| **Autenticação** | 🟡 Parcial | Login/Registo funcional |
-| **Chat** | 🟡 Parcial | UI pronta, backend em desenvolvimento |
-| **Sistema de Equipas** | 🟡 Parcial | UI pronta, backend em desenvolvimento |
-| **Funcionalidades Olheiro** | 🔴 Pendente | Por implementar |
+ 
+| Tabela              | Descrição                                        |
+|---------------------|--------------------------------------------------|
+| `users`             | Utilizadores (jogadores, treinadores, olheiros)  |
+| `players`           | Dados estendidos de jogadores                    |
+| `coaches`           | Dados estendidos de treinadores                  |
+| `teams`             | Equipas                                          |
+| `workouts`          | Treinos                                          |
+| `workoutLogs`       | Registos de treinos completados                  |
+| `games`             | Jogos                                            |
+| `events`            | Eventos de calendário                            |
+| `trainingPlans`     | Planos de treino                                 |
+| `conversations`     | Conversas de chat                                |
+| `messages`          | Mensagens                                        |
+| `blockedUsers`      | Utilizadores bloqueados                          |
+| `follows`           | Sistema de seguir                                |
+| `posts`             | Publicações                                      |
+| `scoutReports`      | Relatórios de olheiros sobre atletas             |
+| `invites`           | Convites de treinadores para atletas             |
 
 
----
 
 ## 🔧 Desenvolvimento
 
@@ -222,12 +213,6 @@ O backend utiliza Convex com as seguintes tabelas:
 - Editor: VS Code recomendado
 - Extensões: ESLint, TypeScript, Expo Tools
 
-### Executar testes
-```bash
-npm run lint
-```
-
----
 
 ## 📱 Plataformas Suportadas
 

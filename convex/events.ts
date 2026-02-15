@@ -10,7 +10,7 @@ export const getEvents = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const user = await ctx.db
@@ -19,12 +19,12 @@ export const getEvents = query({
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     let events = await ctx.db.query("events").collect();
 
-    events = events.filter((e) => e.user_id === user._id.toString());
+    events = events.filter((e) => e.user_id === user._id);
 
     if (args.startDate) {
       events = events.filter((e) => e.date >= args.startDate!);
@@ -76,7 +76,7 @@ export const createEvent = mutation({
       end_time: args.end_time,
       location: args.location,
       type: args.type,
-      user_id: user._id.toString(),
+      user_id: user._id,
       notes: args.notes,
       created_at: Date.now(),
     });
@@ -117,7 +117,7 @@ export const updateEvent = mutation({
       throw new Error("Event not found");
     }
 
-    if (event.user_id !== user._id.toString()) {
+    if (event.user_id !== user._id) {
       throw new Error("Not authorized to update this event");
     }
 
@@ -160,7 +160,7 @@ export const deleteEvent = mutation({
       throw new Error("Event not found");
     }
 
-    if (event.user_id !== user._id.toString()) {
+    if (event.user_id !== user._id) {
       throw new Error("Not authorized to delete this event");
     }
 
@@ -206,7 +206,7 @@ export const getTeamEvents = query({
       .withIndex("by_teamId", (q) => q.eq("teamId", args.teamId))
       .collect();
 
-    const playerUserIds = players.map((p) => p.userId.toString());
+    const playerUserIds = players.map((p) => p.userId);
 
     events = events.filter((e) => playerUserIds.includes(e.user_id));
 

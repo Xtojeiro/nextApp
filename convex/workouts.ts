@@ -1,6 +1,40 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
+// Get workout logs for user
+export const getWorkoutLogs = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .first();
+
+    if (!user) {
+      return [];
+    }
+
+    if (!user) {
+      return [];
+    }
+
+    const logs = await ctx.db
+      .query('workoutLogs')
+      .withIndex('by_userId', (q) => q.eq('userId', user._id))
+      .order('desc')
+      .take(args.limit || 100);
+
+    return logs;
+  },
+});
+
 // Get workouts for user
 export const getWorkouts = query({
   args: {
@@ -10,7 +44,7 @@ export const getWorkouts = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error('Not authenticated');
+      return [];
     }
 
     const user = await ctx.db
@@ -19,7 +53,7 @@ export const getWorkouts = query({
       .first();
 
     if (!user) {
-      throw new Error('User not found');
+      return [];
     }
 
     let workouts;
