@@ -1,7 +1,92 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 
-// Get current user from auth
+const PASSWORD_MIN_LENGTH = 8;
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hashHex;
+}
+
+async function comparePassword(hash: string, password: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const computedHash = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hash === computedHash;
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function sanitizeString(str: string): string {
+  return str.replace(/[<>]/g, "");
+}
+
+export const loginUser = mutation({
+  args: {
+    email: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!isValidEmail(sanitizeString(args.email))) {
+      throw new Error("Invalid email format");
+    }
+
+    if (args.password.length === 0) {
+      throw new Error("Password is required");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+
+    if (!user) {
+      throw new Error("Invalid email or password");
+    }
+
+    if (!user.password_hash) {
+      throw new Error("Invalid email or password");
+    }
+
+    const emailLower = args.email.toLowerCase();
+    const userEmailLower = user.email.toLowerCase();
+    if (emailLower !== userEmailLower) {
+      throw new Error("Invalid email or password");
+    }
+
+    const passwordValid = await comparePassword(user.password_hash, args.password);
+
+    if (!passwordValid) {
+      throw new Error("Invalid email or password");
+    }
+
+    await ctx.db.patch(user._id, {
+      is_active: true,
+      updated_at: Date.now(),
+    });
+
+    return {
+      userId: user._id,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role,
+    };
+  },
+});
+
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
@@ -19,12 +104,12 @@ export const getCurrentUser = query({
   },
 });
 
-// Register new user
 export const registerUser = mutation({
   args: {
     name: v.string(),
     email: v.string(),
     password: v.string(),
+    confirmPassword: v.string(),
     role: v.union(v.literal("athlete"), v.literal("coach"), v.literal("scout")),
     bio: v.optional(v.string()),
     location: v.optional(v.string()),
@@ -35,39 +120,52 @@ export const registerUser = mutation({
     phoneNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Check if user already exists
+    if (!isValidEmail(sanitizeString(args.email))) {
+      throw new Error("Invalid email format");
+    }
+
+    if (args.password.length < PASSWORD_MIN_LENGTH) {
+      throw new Error(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    }
+
+    if (args.password !== args.confirmPassword) {
+      throw new Error("Passwords do not match");
+    }
+
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
       .first();
 
     if (existingUser) {
       throw new Error("User already exists");
     }
 
+    const passwordHash = await hashPassword(args.password);
     const now = Date.now();
-    // Map role values to uppercase schema values
+
     const roleMap: Record<string, "PLAYER" | "COACH" | "SCOUT"> = {
       athlete: "PLAYER",
       coach: "COACH",
       scout: "SCOUT",
     };
+
     const userId = await ctx.db.insert("users", {
-      full_name: args.name,
-      email: args.email,
-      password_hash: args.password, // Note: In production, this should be hashed
+      full_name: sanitizeString(args.name),
+      email: args.email.toLowerCase(),
+      password_hash: passwordHash,
       role: roleMap[args.role],
-      bio: args.bio,
-      location: args.location,
+      bio: args.bio ? sanitizeString(args.bio) : undefined,
+      location: args.location ? sanitizeString(args.location) : undefined,
       age: args.age,
       gender: args.gender,
       push_token: args.phoneNumber,
       is_active: true,
+      is_public: true,
       created_at: now,
       updated_at: now,
     });
 
-    // Register athlete/coach specific data
     if (args.role === "athlete") {
       await ctx.db.insert("players", {
         userId,
@@ -119,11 +217,12 @@ export const updateUser = mutation({
     }
 
     const updateData: any = {};
-    Object.keys(args).forEach((key) => {
-      if (args[key as keyof typeof args] !== undefined) {
-        updateData[key] = args[key as keyof typeof args];
-      }
-    });
+    if (args.name !== undefined) updateData.full_name = sanitizeString(args.name);
+    if (args.bio !== undefined) updateData.bio = sanitizeString(args.bio);
+    if (args.location !== undefined) updateData.location = sanitizeString(args.location);
+    if (args.age !== undefined) updateData.age = args.age;
+    if (args.gender !== undefined) updateData.gender = args.gender;
+    if (args.phoneNumber !== undefined) updateData.push_token = args.phoneNumber;
     updateData.updated_at = Date.now();
 
     await ctx.db.patch(user._id, updateData);
@@ -131,7 +230,6 @@ export const updateUser = mutation({
   },
 });
 
-// Generate upload URL for avatar
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
@@ -144,7 +242,6 @@ export const generateUploadUrl = mutation({
   },
 });
 
-// Update user avatar
 export const updateAvatar = mutation({
   args: {
     storageId: v.id("_storage"),
@@ -178,7 +275,6 @@ export const updateAvatar = mutation({
   },
 });
 
-// Toggle profile visibility
 export const toggleProfileVisibility = mutation({
   args: {},
   handler: async (ctx) => {
@@ -205,7 +301,6 @@ export const toggleProfileVisibility = mutation({
   },
 });
 
-// Get profile visibility
 export const getProfileVisibility = query({
   args: {
     userId: v.id("users"),
@@ -220,7 +315,6 @@ export const getProfileVisibility = query({
   },
 });
 
-// Search users
 export const searchUsers = query({
   args: {
     query: v.string(),
@@ -228,22 +322,22 @@ export const searchUsers = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
+    const sanitizedQuery = sanitizeString(args.query);
 
-    // Get all public users
     const publicUsers = await ctx.db.query("users").collect();
 
     const filteredUsers = publicUsers.filter(
       (user) =>
-        user.full_name.toLowerCase().includes(args.query.toLowerCase()) ||
-        user.bio?.toLowerCase().includes(args.query.toLowerCase()) ||
-        user.location?.toLowerCase().includes(args.query.toLowerCase()),
+        user.is_public &&
+        (user.full_name.toLowerCase().includes(sanitizedQuery.toLowerCase()) ||
+          user.bio?.toLowerCase().includes(sanitizedQuery.toLowerCase()) ||
+          user.location?.toLowerCase().includes(sanitizedQuery.toLowerCase())),
     );
 
-    return filteredUsers;
+    return filteredUsers.slice(0, limit);
   },
 });
 
-// Get team athletes (for coaches)
 export const getTeamAthletes = query({
   args: {
     teamId: v.optional(v.id("teams")),
@@ -265,7 +359,6 @@ export const getTeamAthletes = query({
 
     let targetTeamId = args.teamId;
 
-    // If no teamId provided, get coach's team
     if (!targetTeamId) {
       const coachProfile = await ctx.db
         .query("coaches")
@@ -296,7 +389,6 @@ export const getTeamAthletes = query({
   },
 });
 
-// Add athlete note (for coaches)
 export const addAthleteNote = mutation({
   args: {
     athleteId: v.id("users"),
@@ -317,13 +409,10 @@ export const addAthleteNote = mutation({
       throw new Error("Not authorized");
     }
 
-    // This would typically be stored in a separate notes table
-    // For now, returning success as placeholder
     return { success: true };
   },
 });
 
-// Get player stats
 export const getPlayerStats = query({
   args: {
     userId: v.id("users"),
@@ -351,7 +440,6 @@ export const getPlayerStats = query({
   },
 });
 
-// Get coach dashboard
 export const getCoachDashboard = query({
   args: {},
   handler: async (ctx) => {

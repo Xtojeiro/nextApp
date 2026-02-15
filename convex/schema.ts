@@ -71,18 +71,18 @@ export default defineSchema({
 
   // Workouts
   workouts: defineTable({
-    user_id: v.string(), // Changed to string to match existing data
+    user_id: v.id("users"),
     name: v.string(),
-    description: v.optional(v.string()), // Added to match existing data
-    type: v.optional(v.string()), // Added to match existing data
-    duration_minutes: v.optional(v.number()), // Changed to match existing data
-    objective: v.optional(v.string()), // Added to match existing data
-    scheduledDate: v.optional(v.number()), // Added
+    description: v.optional(v.string()),
+    type: v.optional(v.string()),
+    duration_minutes: v.optional(v.number()),
+    objective: v.optional(v.string()),
+    scheduledDate: v.optional(v.number()),
     difficulty: v.optional(v.union(
       v.literal("beginner"),
       v.literal("intermediate"),
       v.literal("advanced"),
-    )), // Added
+    )),
     status: v.union(
       v.literal("scheduled"),
       v.literal("in_progress"),
@@ -90,7 +90,7 @@ export default defineSchema({
       v.literal("skipped"),
     ),
     created_at: v.number(),
-  }),
+  }).index("by_user_id", ["user_id"]),
 
   // Workout logs
   workoutLogs: defineTable({
@@ -142,9 +142,9 @@ export default defineSchema({
   events: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
-    date: v.string(), // Changed to string to match existing data
-    start_time: v.string(), // Changed to string to match existing data
-    end_time: v.string(), // Changed to string to match existing data
+    date: v.string(),
+    start_time: v.string(),
+    end_time: v.string(),
     location: v.optional(v.string()),
     type: v.union(
       v.literal("game"),
@@ -152,8 +152,8 @@ export default defineSchema({
       v.literal("meeting"),
       v.literal("other"),
     ),
-    user_id: v.string(), // Changed to string to match existing data
-    notes: v.optional(v.string()), // Added to match existing data
+    user_id: v.id("users"),
+    notes: v.optional(v.string()),
     created_at: v.number(),
   })
     .index("by_date", ["date"])
@@ -210,29 +210,56 @@ export default defineSchema({
 
   // Follows
   follows: defineTable({
-    follower_id: v.string(), // Changed to string to match existing data
-    following_id: v.string(), // Changed to string to match existing data
+    follower_id: v.id("users"),
+    following_id: v.id("users"),
     created_at: v.number(),
-  }),
+  })
+    .index("by_follower_id", ["follower_id"])
+    .index("by_following_id", ["following_id"]),
 
   // Posts
   posts: defineTable({
-    user_id: v.string(), // Changed to string to match existing data
+    user_id: v.id("users"),
     content: v.string(),
     images: v.optional(v.array(v.string())),
-    image_url: v.optional(v.string()), // Added to match existing data
-    likes: v.optional(v.array(v.string())), // Changed to string to match existing data and optional
+    image_url: v.optional(v.string()),
+    likes: v.optional(v.array(v.string())),
     comments: v.optional(
       v.array(
         v.object({
-          // Made optional to match existing data
-          user_id: v.string(), // Changed to string
+          user_id: v.id("users"),
           content: v.string(),
           timestamp: v.number(),
         }),
       ),
     ),
-    is_public: v.optional(v.boolean()), // Changed to snake_case and optional
+    is_public: v.optional(v.boolean()),
     created_at: v.number(),
-  }),
+  }).index("by_user_id", ["user_id"]),
+
+  // Scout Reports
+  scoutReports: defineTable({
+    scoutId: v.id("users"),
+    athleteId: v.id("users"),
+    content: v.string(),
+    rating: v.optional(v.number()),
+    position: v.optional(v.string()),
+    strengths: v.optional(v.array(v.string())),
+    weaknesses: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+  })
+    .index("by_scoutId", ["scoutId"])
+    .index("by_athleteId", ["athleteId"]),
+
+  // Coach Invites
+  invites: defineTable({
+    coachId: v.id("users"),
+    athleteId: v.id("users"),
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected")),
+    message: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_coachId", ["coachId"])
+    .index("by_athleteId", ["athleteId"])
+    .index("by_status", ["status"]),
 });

@@ -120,7 +120,7 @@
     "save": "Salvar",
     "cancel": "Cancelar"
   },
-  "dashboard": {
+"dashboard": {
     "title": "Dashboard",
     "subtitle": "Visão geral da sua atividade desportiva",
     "activityHeatmap": "Mapa de Atividade",
@@ -151,7 +151,22 @@
     "weekView": "Vista Semanal",
     "today": "Hoje",
     "yesterday": "Ontem",
-    "tomorrow": "Amanhã"
+    "tomorrow": "Amanhã",
+    "yourStats": "As Minhas Estatísticas",
+    "workouts": "Treinos",
+    "games": "Jogos",
+    "bestStreak": "Melhor Sequência",
+    "evolutionChart": "Evolução",
+    "comparisonChart": "Comparação",
+    "noData": "Sem dados disponíveis",
+    "currentPeriod": "Período Atual",
+    "previousPeriod": "Período Anterior",
+    "weeklyTrend": "Tendência Semanal",
+    "monthlyTrend": "Tendência Mensal",
+    "workoutEvolution": "Evolução de Treinos",
+    "gameEvolution": "Evolução de Jogos",
+    "pointsEvolution": "Evolução de Pontos",
+    "performance": "Desempenho"
   },
   "common": {
     "loading": "Carregando...",

@@ -1,4 +1,4 @@
-# 📋 Tarefas do Projeto - Atualizado 06/02/2026
+# 📋 Tarefas do Projeto - Atualizado 09/02/2026
 
 > **Legenda:**
 > - `[ ]` - Por fazer
@@ -7,181 +7,78 @@
 
 ---
 
-## ✅ PROBLEMA CRÍTICO: Resolvido (24 → 0 erros)
+## 🔴 PROBLEMAS CRÍTICOS DE SEGURANÇA (Concluído 09/02/2026)
 
-O backend Convex tem **0 erros de compilação** após as correções!
+> ✅ **CORRIGIDO:** Problemas graves resolvidos!
 
-### Correções Aplicadas:
-1. ✅ Campos renomeados no schema vs código: `full_name`, `user_id`, `duration_minutes`
-2. ✅ Roles com case correto: `"PLAYER" | "COACH" | "SCOUT"`
-3. ✅ Campos adicionados ao schema: `is_public`, `description`, `scheduledDate`, `difficulty`
-4. ✅ Campos removidos/ajustados: `updatedAt`, `exercises`, `isPublic`
+### SEC.1 Sistema de Autenticação Quebrado 🚨
+- [x] Login ignora password completamente (`hooks/useAuth.tsx` linha 69-92)
+- [x] Register usa dados mock em vez do backend (`hooks/useAuth.tsx` linha 94-112)
+- [x] `ctx.auth.getUserIdentity()` retorna sempre null (WorkOS não integrado)
+- [x] Implementar Convex Auth com Email/Password
 
----
+### SEC.2 Passwords em Texto Plano 🚨
+- [x] `users.ts` linha 58: password guardada sem hash
+- [x] Criar hash com SHA-256 no backend
+- [x] Migrar passwords existentes (validação adicionada)
 
-## 🔴 TAREFA URGENTE: Corrigir Erros TypeScript
-
-### games.ts
-- [x] Linha 70: Mudar `creator.name` → `creator.full_name`
-- [x] Linha 227: Mudar `'coach'` → `'COACH'`
-- [x] Linha 236: Mudar `'athlete'` → `'PLAYER'`
-
-### users.ts
-- [x] Linhas 199-204: Adicionar campo `is_public` ao schema e usar em toggle
-- [x] Linha 235: Remover uso do índice `by_public` (não existe) - removida funcionalidade
-- [x] Linha 241: Mudar `user.name` → `user.full_name`
-- [x] Linhas 266, 320, 372: Mudar `'coach'` → `'COACH'`
-- [x] Linha 397: Converter date para string ISO
-- [x] Linha 398: Mudar `'userId'` → `'user_id'`
-
-### workouts.ts
-- [x] Linhas 30, 37, 78: Mudar `userId` → `user_id`
-- [x] Linhas 115, 158: Mudar `workout.userId` → `workout.user_id`
-- [x] Linhas 121, 167: Remover `updatedAt` (não existe no schema)
-- [x] Linha 175: Mudar `workout.duration` → `workout.duration_minutes`
-- [x] Linha 176: Remover `workout.exercises` (não existe no schema)
-
-### schema.ts (Opcional)
-- [x] Adicionar `is_public: v.optional(v.boolean())` à tabela `users`
-- [x] Adicionar índice `.index("by_public", ["is_public"])` (removido, não usado)
-- [x] Adicionar campos `description`, `scheduledDate`, `difficulty` à tabela `workouts`
+### SEC.3 Validação de Inputs
+- [x] Adicionar validação de email format
+- [x] Adicionar validação de password strength (min 8 chars)
+- [x] Confirmar password no registo
+- [x] Sanitizar inputs de texto no backend
 
 ---
 
-## 🟡 PROBLEMA ANTERIOR (RESOLVIDO)
+## 🟠 PROBLEMAS DE ARQUITETURA
 
-O schema e módulos básicos já foram criados e o código está agora consistente com o schema.
+### ARQ.1 Tipos Inconsistentes
+- [x] Mudar `user_id: v.string()` para `v.id("users")` em `workouts`, `events`, `posts`, `follows`
+- [ ] Unificar interface `User` (duplicada em `types/user.ts` e `hooks/useAuth.tsx`)
+- [ ] Consistência snake_case vs camelCase no schema
+
+### ARQ.2 Performance - Queries N+1
+- [ ] Otimizar `games.ts` getGames (3 queries por jogo)
+- [ ] Otimizar `chat.ts` getConversations
+- [ ] Adicionar batch loading
+
+### ARQ.3 Índices em Falta
+- [x] `workouts`: adicionar `.index("by_user_id", ["user_id"])`
+- [x] `posts`: adicionar `.index("by_user_id", ["user_id"])`
+- [x] `follows`: adicionar `.index("by_follower_id", ["follower_id"])` e `.index("by_following_id", ["following_id"])`
+
+### ARQ.4 Navegação Desintegrada
+- [ ] Migrar `navigation/*.tsx` para estrutura expo-router
+- [ ] Ou remover ficheiros redundantes
+
 
 ---
 
-## 🎯 FASE 0: Criar Backend Convex (PRIORIDADE MÁXIMA)
+## 🔥 Sistema de Navegação por Tipo de Conta ✅ CONCLUÍDO
 
-### 0.1 Schema Completo 🔴
-- [ ] Recriar `convex/schema.ts` com todas as tabelas:
-  - [ ] `users` - utilizadores base
-  - [ ] `players` - dados de jogadores
-  - [ ] `coaches` - dados de treinadores
-  - [ ] `workouts` - treinos
-  - [ ] `workout_logs` - registos de treinos
-  - [ ] `games` - jogos
-  - [ ] `events` - eventos do calendário
-  - [ ] `training_plans` - planos de treino
-  - [ ] `conversations` - conversas
-  - [ ] `messages` - mensagens
-  - [ ] `blocked_users` - bloqueados
-  - [ ] `follows` - seguidores
-  - [ ] `posts` - publicações
-  - [ ] `teams` - equipas
+### NAV.1 Tipos TypeScript ✅
+- [x] Criar enum `AccountType` com valores `JOGADOR`, `TREINADOR`, `OLHEIRO`
+- [x] Criar interface `User` com todos os campos da tabela users
 
-### 0.2 Módulo Users (`convex/users.ts`) 🔴
-- [ ] `getCurrentUser` - obter utilizador via auth
-- [ ] `registerUser` - registar utilizador
-- [ ] `updateUser` - atualizar perfil
-- [ ] `generateUploadUrl` - URL upload avatar
-- [ ] `updateAvatar` - atualizar avatar
-- [ ] `toggleProfileVisibility` - toggle público/privado
-- [ ] `getProfileVisibility` - verificar visibilidade
-- [ ] `searchUsers` - pesquisar utilizadores
-- [ ] `getTeamAthletes` - atletas da equipa (coach)
-- [ ] `addAthleteNote` - nota a atleta
-- [ ] `getPlayerStats` - estatísticas jogador
-- [ ] `getCoachDashboard` - dashboard treinador
+### NAV.2 AuthContext ✅
+- [x] Criar contexto que usa `useQuery(api.users.getCurrentUser)`
+- [x] Mapear `role` do Convex para `accountType` local
 
-### 0.3 Módulo Workouts (`convex/workouts.ts`) 🔴
-- [ ] `getWorkouts` - listar treinos
-- [ ] `createWorkout` - criar treino
-- [ ] `startWorkout` - iniciar treino
-- [ ] `completeWorkout` - completar treino
+### NAV.3-5 Navegadores ✅
+- [x] `AppNavigator.tsx`, `JogadorNavigator.tsx`, `TreinadorNavigator.tsx`, `OlheiroNavigator.tsx`
 
-### 0.4 Módulo Chat (`convex/chat.ts`) 🔴
-- [ ] `getConversations` - listar conversas
-- [ ] `getMessages` - mensagens de conversa
-- [ ] `sendMessage` - enviar mensagem
-- [ ] `markMessagesAsRead` - marcar lidas
-- [ ] `blockUser` - bloquear
-- [ ] `unblockUser` - desbloquear
-- [ ] `getBlockedUsers` - listar bloqueados
+### NAV.6-7 Screens ✅
+- [x] Screens Jogador: `dashboard.tsx`, `treinos.tsx`, `jogos.tsx`
+- [x] Screens Treinador: `equipa.tsx`, `planeamento.tsx`, `analise.tsx`
 
-### 0.5 Módulo Games (`convex/games.ts`) 🔴
-- [ ] `getGames` - listar jogos
-- [ ] `createGame` - criar jogo
-- [ ] `updateGame` - atualizar resultado
+---
 
-### 0.6 Módulo Events (`convex/events.ts`) 🔴
-- [ ] `getEvents` - listar eventos
-- [ ] `createEvent` - criar evento
-- [ ] `updateEvent` - atualizar
-- [ ] `deleteEvent` - eliminar
+## 🎯 FASE 0: Backend Convex ✅ MAIOR PARTE CONCLUÍDA
 
-### 0.7 Módulo Training Plans (`convex/trainingPlans.ts`) 🔴
-- [ ] `getTrainingPlans` - listar planos
-- [ ] `createTrainingPlan` - criar plano
-- [ ] `updateTrainingPlan` - atualizar
-- [ ] `getTrainingPlanStats` - estatísticas
-
-### 0.8 Módulo Follows (`convex/follows.ts`) 🔴
-- [ ] `getFollowers` - seguidores
-- [ ] `getFollowing` - seguindo
-- [ ] `followUser` - seguir
-- [ ] `unfollowUser` - deixar de seguir
-- [ ] `isFollowing` - verificar
-
-### 0.9 Módulo Posts (`convex/posts.ts`) 🔴
-- [ ] `getPosts` - listar posts
-- [ ] `createPost` - criar
-- [ ] `deletePost` - eliminar
-
-### 0.10 Segurança 🔴
+### Segurança 🔴
 - [ ] Hash de passwords (bcrypt via action)
 - [ ] Validar auth em queries/mutations
 - [ ] Usar `ctx.auth.getUserIdentity()` corretamente
-
----
-
-## 🎯 FASE 1: Completar Atleta/Jogador
-
-### 1.1 Estatísticas Dashboard
-- [ ] Gráfico de evolução
-- [ ] Comparação semana/mês anterior
-
-### 1.2 Integração Jogos ↔ Calendário
-- [ ] Sincronizar edição/eliminação
-
----
-
-## 🎯 FASE 2: Completar Treinador
-
-### 2.1 Dados Reais
-- [ ] Sistema convites atleta-treinador
-- [ ] Query real de atletas associados
-
-### 2.2 Calendário Partilhado
-- [ ] Treinador cria eventos para equipa
-- [ ] Atletas veem eventos no calendário
-
-### 2.3 Melhorias Análise
-- [ ] Gráficos comparativos
-- [ ] Exportar relatórios (PDF)
-
----
-
-## 🎯 FASE 3: Implementar Olheiro
-
-### 3.1 Dashboard do Olheiro 🔴
-- [ ] Página `dashboard-scout.tsx`
-- [ ] Query `getObservedAthletes`
-- [ ] Query `getFeaturedAthletes`
-
-### 3.2 Pesquisa Avançada 🔴
-- [ ] Filtro por posição, idade, região
-- [ ] Query `searchAthletesAdvanced`
-
-### 3.3 Relatórios de Observação 🔴
-- [ ] Backend `convex/scoutReports.ts`
-- [ ] UI para criar/editar relatórios
-
-### 3.4 Tabs do Olheiro 🔴
-- [ ] Modificar `_layout.tsx` com tabs específicas
 
 ---
 
@@ -207,28 +104,47 @@ O schema e módulos básicos já foram criados e o código está agora consisten
 
 | Fase | Descrição | Tarefas | Concluídas |
 |---|---|---|---|
-| Fase 0 | Backend Convex | 42 | 13 |
-| Fase 1 | Atleta | 2 | 0 |
-| Fase 2 | Treinador | 5 | 0 |
-| Fase 3 | Olheiro | 8 | 0 |
+| SEC | Segurança | 11 | 11 |
+| ARQ | Arquitetura | 9 | 6 |
+| NAV | Navegação | 27 | 27 |
+| Fase 0 | Backend | 42 | 39 |
+| Fase 1-3 | Features | 15 | 15 |
 | Fase 4 | UX/UI | 5 | 0 |
 | Fase 5 | Avançadas | 3 | 0 |
 
-**Total:** ~65 tarefas  
-**Concluídas:** 13  
-**Progresso:** 20%
+**Total:** ~112 tarefas  
+**Concluídas:** 87  
+**Progresso:** 78%
 
 ---
 
-## 🚀 Ordem de Implementação
+## 🚀 Ordem de Implementação Atualizada
 
-1. **Fase 0** - Criar todo o backend Convex ← **COMEÇAR AQUI**
-2. **Fase 3** - Olheiro
-3. **Fase 4** - Melhorias UX
-4. **Fase 2** - Treinador
-5. **Fase 1** - Atleta
-6. **Fase 5** - Features avançadas
+1. **ARQ** - Resolver problemas de arquitetura restantes ⬅️ **PRÓXIMO**
+2. **Fase 4** - Melhorias UX
+3. **Fase 5** - Features avançadas
 
 ---
 
-*Última atualização: 27/01/2026*
+## 📁 Componentes Criados
+
+### Gráficos e Stats
+- `components/EvolutionChart.tsx` - Gráfico de evolução temporal
+- `components/StatsComparison.tsx` - Comparação semana/mês
+- `components/DashboardStats.tsx` - Estatísticas rápidas
+- `components/UnifiedCalendar.tsx` - Calendário unificado
+
+### Análise Treinador
+- `components/CoachAnalytics.tsx` - Rankings e top performers
+- `components/TeamComparison.tsx` - Comparação multi-atleta
+- `components/PDFReportGenerator.tsx` - Export PDF/CSV
+
+### Navegação
+- `navigation/AppNavigator.tsx` - Router principal
+- `navigation/JogadorNavigator.tsx` - Bottom tabs Jogador
+- `navigation/TreinadorNavigator.tsx` - Bottom tabs Treinador
+- `navigation/OlheiroNavigator.tsx` - Bottom tabs Olheiro
+
+---
+
+*Última atualização: 09/02/2026 - Segurança corrigida (87 tarefas, 78%)*

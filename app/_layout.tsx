@@ -6,22 +6,16 @@ import { Stack } from "expo-router";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!);
 
-function AppContent() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="register" />
-    </Stack>
-  );
-}
-
 export default function Layout() {
   return (
     <ConvexProvider client={convex}>
       <AuthProvider>
         <ThemeProvider>
-          <AppContent />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
         </ThemeProvider>
       </AuthProvider>
     </ConvexProvider>

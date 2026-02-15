@@ -131,7 +131,7 @@
     "save": "Save",
     "cancel": "Cancel"
   },
-  "dashboard": {
+"dashboard": {
     "title": "Dashboard",
     "subtitle": "Overview of your sports activity",
     "activityHeatmap": "Activity Heatmap",
@@ -162,7 +162,22 @@
     "weekView": "Week View",
     "today": "Today",
     "yesterday": "Yesterday",
-    "tomorrow": "Tomorrow"
+    "tomorrow": "Tomorrow",
+    "yourStats": "My Statistics",
+    "workouts": "Workouts",
+    "games": "Games",
+    "bestStreak": "Best Streak",
+    "evolutionChart": "Evolution",
+    "comparisonChart": "Comparison",
+    "noData": "No data available",
+    "currentPeriod": "Current Period",
+    "previousPeriod": "Previous Period",
+    "weeklyTrend": "Weekly Trend",
+    "monthlyTrend": "Monthly Trend",
+    "workoutEvolution": "Workout Evolution",
+    "gameEvolution": "Game Evolution",
+    "pointsEvolution": "Points Evolution",
+    "performance": "Performance"
   },
   "common": {
     "loading": "Loading...",

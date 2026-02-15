@@ -60,12 +60,17 @@ export default function Register() {
     }
 
     try {
+      const roleMap: Record<AccountType, "athlete" | "coach" | "scout"> = {
+        PLAYER: "athlete",
+        COACH: "coach",
+        SCOUT: "scout",
+      };
       const userId = await registerUserMutation({
-        fullName,
+        name: fullName,
         age: parseInt(age),
         email,
         password,
-        role: accountType,
+        role: roleMap[accountType!],
       });
 
       // Save user data to local storage

@@ -3,27 +3,29 @@ import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "convex/react";
-import { Tabs, useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Image } from "react-native";
+import { ActivityIndicator, Image, View } from "react-native";
 
 const TabsLayout = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, accountType } = useAuth();
   const { colors } = useTheme();
   const { t } = useTranslation();
   const convexUser = useQuery(api.users.getCurrentUser);
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/login");
-    }
-  }, [isLoading, user, router]);
-
-  if (isLoading || !user || !convexUser) {
-    return null;
+  if (isLoading || !user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
+
+  // Use accountType from useAuth, fallback to convexUser.role
+  const role = accountType === "JOGADOR" ? "PLAYER" : 
+               accountType === "TREINADOR" ? "COACH" : 
+               accountType === "OLHEIRO" ? "SCOUT" : 
+               convexUser?.role || "PLAYER";
 
   // Define tabs based on user role
   const getPlayerTabs = () => (
@@ -170,9 +172,9 @@ const TabsLayout = () => {
       }}
     >
       {/* Role-specific tabs */}
-      {convexUser.role === "PLAYER" && getPlayerTabs()}
-      {convexUser.role === "COACH" && getCoachTabs()}
-      {convexUser.role === "SCOUT" && getScoutTabs()}
+      {role === "PLAYER" && getPlayerTabs()}
+      {role === "COACH" && getCoachTabs()}
+      {role === "SCOUT" && getScoutTabs()}
       
       {/* Common tabs for all users */}
       {getCommonTabs()}
