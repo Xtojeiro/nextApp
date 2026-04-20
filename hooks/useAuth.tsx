@@ -1,4 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AccountType, ROLE_TO_ACCOUNT_TYPE } from "@/types/user";
+import { useUser, useAuth as useClerkAuth, SignedIn, SignedOut } from "@clerk/clerk-expo";
 import { useConvex } from "convex/react";
 import {
   createContext,
@@ -8,13 +9,13 @@ import {
   useState,
 } from "react";
 import { api } from "../convex/_generated/api";
-import { AccountType, ROLE_TO_ACCOUNT_TYPE } from "@/types/user";
 
 interface User {
   id: string;
   _id?: string;
   email: string;
   full_name: string;
+  fullName?: string;
   role: "PLAYER" | "COACH" | "SCOUT" | "ADMIN" | "MEDICAL" | "PUBLIC";
   avatar?: string;
   avatar_url?: string;
@@ -27,6 +28,7 @@ interface AuthContextType {
   user: User | null;
   accountType: AccountType | null;
   isLoading: boolean;
+  isSignedIn: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (
     fullName: string,
@@ -42,22 +44,61 @@ interface AuthContextType {
 const AuthContext = createContext<undefined | AuthContextType>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const { signOut } = useClerkAuth();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const convex = useConvex();
 
   useEffect(() => {
-    checkAuthState();
-  }, []);
+    if (isClerkLoaded) {
+      if (clerkUser) {
+        setIsSignedIn(true);
+        fetchOrCreateUser();
+      } else {
+        setIsSignedIn(false);
+        setUser(null);
+        setIsLoading(false);
+      }
+    }
+  }, [isClerkLoaded, clerkUser]);
 
-  const checkAuthState = async () => {
+  const fetchOrCreateUser = async () => {
     try {
-      const userData = await AsyncStorage.getItem("user");
-      if (userData) {
-        setUser(JSON.parse(userData));
+      const convexUser = await convex.query(api.users.getCurrentUser, {});
+      if (convexUser) {
+        const mappedUser: User = {
+          id: convexUser._id.toString(),
+          _id: convexUser._id.toString(),
+          email: convexUser.email,
+          full_name: convexUser.full_name,
+          fullName: convexUser.full_name,
+          role: convexUser.role,
+          avatar: convexUser.avatar,
+          bio: convexUser.bio,
+          is_public: convexUser.is_public,
+        };
+        setUser(mappedUser);
+      } else if (clerkUser) {
+        const newUser = await convex.mutation(api.users.createFromClerk, {
+          clerkId: clerkUser.id,
+          email: clerkUser.primaryEmailAddress?.emailAddress || "",
+          fullName: clerkUser.fullName || clerkUser.firstName + " " + (clerkUser.lastName || ""),
+        });
+        if (newUser) {
+          const mappedUser: User = {
+            id: newUser.userId.toString(),
+            _id: newUser.userId.toString(),
+            email: clerkUser.primaryEmailAddress?.emailAddress || "",
+            full_name: clerkUser.fullName || "",
+            fullName: clerkUser.fullName || "",
+            role: newUser.role,
+          };
+          setUser(mappedUser);
+        }
       }
     } catch (error) {
-      console.error("Error checking auth state:", error);
     } finally {
       setIsLoading(false);
     }
@@ -68,29 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const result = await convex.mutation(api.users.loginUser, {
-        email: email.toLowerCase().trim(),
-        password,
-      });
-
-      if (result) {
-        const mappedUser: User = {
-          id: result.userId.toString(),
-          _id: result.userId.toString(),
-          email: result.email,
-          full_name: result.fullName,
-          role: result.role,
-        };
-        setUser(mappedUser);
-        await AsyncStorage.setItem("user", JSON.stringify(mappedUser));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Login error:", error);
-      return false;
-    }
+    return false;
   };
 
   const register = async (
@@ -100,71 +119,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     confirmPassword: string,
     role: "PLAYER" | "COACH" | "SCOUT" = "PLAYER",
   ): Promise<boolean> => {
-    try {
-      const roleMap = {
-        PLAYER: "athlete",
-        COACH: "coach",
-        SCOUT: "scout",
-      };
-
-      const userId = await convex.mutation(api.users.registerUser, {
-        name: fullName.trim(),
-        email: email.toLowerCase().trim(),
-        password,
-        confirmPassword,
-        role: roleMap[role] as "athlete" | "coach" | "scout",
-      });
-
-      if (userId) {
-        const mockUser: User = {
-          id: userId.toString(),
-          email: email.toLowerCase().trim(),
-          full_name: fullName.trim(),
-          role,
-        };
-        setUser(mockUser);
-        await AsyncStorage.setItem("user", JSON.stringify(mockUser));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Register error:", error);
-      return false;
-    }
+    return false;
   };
 
   const logout = async () => {
+    await signOut();
     setUser(null);
-    await AsyncStorage.removeItem("user");
+    setIsSignedIn(false);
   };
 
   const refreshUser = async () => {
-    try {
-      const userData = await convex.query(api.users.getCurrentUser, {});
-      if (userData) {
-        const mappedUser: User = {
-          id: userData._id.toString(),
-          _id: userData._id.toString(),
-          email: userData.email,
-          full_name: userData.full_name,
-          role: userData.role,
-          avatar: userData.avatar,
-          bio: userData.bio,
-          is_public: userData.is_public,
-        };
-        setUser(mappedUser);
-        await AsyncStorage.setItem("user", JSON.stringify(mappedUser));
-      }
-    } catch (error) {
-      console.error("Error refreshing user:", error);
-    }
+    await fetchOrCreateUser();
   };
 
   const accountType = user ? getAccountType(user.role) : null;
 
   return (
     <AuthContext.Provider
-      value={{ user, accountType, isLoading, login, register, logout, refreshUser }}
+      value={{
+        user,
+        accountType,
+        isLoading,
+        isSignedIn,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -112,6 +112,15 @@ const TabsLayout = () => {
         }}
       />
       <Tabs.Screen
+        name="rankings"
+        options={{
+          title: "Rankings",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "trophy" : "trophy-outline"} color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: t("tabs.feed"),

@@ -13,10 +13,7 @@ export default function Header() {
         paddingHorizontal: 16,
         marginBottom: 16,
         borderRadius: 12,
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        boxShadow: `0 2px 4px ${colors.shadow}`,
         elevation: 3,
       }}
     >

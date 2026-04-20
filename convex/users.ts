@@ -61,12 +61,6 @@ export const loginUser = mutation({
       throw new Error("Invalid email or password");
     }
 
-    const emailLower = args.email.toLowerCase();
-    const userEmailLower = user.email.toLowerCase();
-    if (emailLower !== userEmailLower) {
-      throw new Error("Invalid email or password");
-    }
-
     const passwordValid = await comparePassword(user.password_hash, args.password);
 
     if (!passwordValid) {
@@ -101,6 +95,59 @@ export const getCurrentUser = query({
       .first();
 
     return user;
+  },
+});
+
+export const createFromClerk = mutation({
+  args: {
+    clerkId: v.string(),
+    email: v.string(),
+    fullName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+
+    if (existingUser) {
+      return {
+        userId: existingUser._id,
+        role: existingUser.role,
+      };
+    }
+
+    const now = Date.now();
+
+    const userId = await ctx.db.insert("users", {
+      full_name: args.fullName,
+      email: args.email.toLowerCase(),
+      clerk_id: args.clerkId,
+      role: "PLAYER",
+      is_active: true,
+      is_public: true,
+      created_at: now,
+      updated_at: now,
+    });
+
+    await ctx.db.insert("players", {
+      userId,
+      teamId: undefined,
+      position: undefined,
+      stats: {
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        points: 0,
+        assists: 0,
+        rebounds: 0,
+      },
+    });
+
+    return {
+      userId,
+      role: "PLAYER" as const,
+    };
   },
 });
 
@@ -522,5 +569,148 @@ export const getCoachDashboard = query({
       upcomingEvents: upcomingEvents.length,
       athletes,
     };
+  },
+});
+
+// Delete user account
+export const deleteAccount = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const userId = user._id;
+
+    // Delete related data
+    
+    // Delete player's profile if exists
+    const playerProfile = await ctx.db
+      .query("players")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+    if (playerProfile) {
+      await ctx.db.delete(playerProfile._id);
+    }
+
+    // Delete coach's profile if exists
+    const coachProfile = await ctx.db
+      .query("coaches")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+    if (coachProfile) {
+      await ctx.db.delete(coachProfile._id);
+    }
+
+    // Delete posts
+    const posts = await ctx.db
+      .query("posts")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .collect();
+    for (const post of posts) {
+      await ctx.db.delete(post._id);
+    }
+
+    // Delete workout logs
+    const workoutLogs = await ctx.db
+      .query("workoutLogs")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const log of workoutLogs) {
+      await ctx.db.delete(log._id);
+    }
+
+    // Delete workouts
+    const workouts = await ctx.db
+      .query("workouts")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .collect();
+    for (const workout of workouts) {
+      await ctx.db.delete(workout._id);
+    }
+
+    // Delete follows (as follower)
+    const followsAsFollower = await ctx.db
+      .query("follows")
+      .withIndex("by_follower_id", (q) => q.eq("follower_id", userId))
+      .collect();
+    for (const follow of followsAsFollower) {
+      await ctx.db.delete(follow._id);
+    }
+
+    // Delete follows (as following)
+    const followsAsFollowing = await ctx.db
+      .query("follows")
+      .withIndex("by_following_id", (q) => q.eq("following_id", userId))
+      .collect();
+    for (const follow of followsAsFollowing) {
+      await ctx.db.delete(follow._id);
+    }
+
+    // Delete blocked users
+    const blockedByUser = await ctx.db
+      .query("blockedUsers")
+      .withIndex("by_blockerId", (q) => q.eq("blockerId", userId))
+      .collect();
+    for (const blocked of blockedByUser) {
+      await ctx.db.delete(blocked._id);
+    }
+
+    const blockedUsers = await ctx.db
+      .query("blockedUsers")
+      .withIndex("by_blockedId", (q) => q.eq("blockedId", userId))
+      .collect();
+    for (const blocked of blockedUsers) {
+      await ctx.db.delete(blocked._id);
+    }
+
+    // Delete conversations and messages
+    const conversations = await ctx.db.query("conversations").collect();
+    const userConversations = conversations.filter(
+      (c) => c.user_one_id === userId || c.user_two_id === userId
+    );
+    for (const conv of userConversations) {
+      const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation_id", (q) => q.eq("conversation_id", conv._id))
+        .collect();
+      for (const msg of messages) {
+        await ctx.db.delete(msg._id);
+      }
+      await ctx.db.delete(conv._id);
+    }
+
+    // Delete notifications
+    const notifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const notif of notifications) {
+      await ctx.db.delete(notif._id);
+    }
+
+    // Delete user achievements
+    const userAchievements = await ctx.db
+      .query("userAchievements")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const ua of userAchievements) {
+      await ctx.db.delete(ua._id);
+    }
+
+    // Delete user
+    await ctx.db.delete(userId);
+
+    return { success: true };
   },
 });

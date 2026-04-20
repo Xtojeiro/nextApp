@@ -17,12 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Workout = {
-  _id: string;
+  _id: any;
   name: string;
-  type: "gym" | "football";
+  type: any;
   duration_minutes?: number;
   objective?: string;
-  status: "planned" | "in_progress" | "completed";
+  status: any;
   exercises?: Array<{
     name: string;
     sets?: number;
@@ -35,10 +35,10 @@ export default function Treinos() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const workouts = useQuery(api.workouts.getWorkouts) || [];
-  const startWorkoutMutation = useMutation(api.workouts.startWorkout);
-  const completeWorkoutMutation = useMutation(api.workouts.completeWorkout);
-  const createWorkoutMutation = useMutation(api.workouts.createWorkout);
+  const workouts = useQuery(api.workouts.getWorkouts as any, {}) || [];
+  const startWorkoutMutation = useMutation(api.workouts.startWorkout as any);
+  const completeWorkoutMutation = useMutation(api.workouts.completeWorkout as any);
+  const createWorkoutMutation = useMutation(api.workouts.createWorkout as any);
 
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "gym" | "football">(
@@ -65,7 +65,7 @@ export default function Treinos() {
     return () => clearInterval(interval);
   }, [isExecuting]);
 
-  const filteredWorkouts = workouts.filter((workout) => {
+  const filteredWorkouts = workouts.filter((workout: any) => {
     const matchesSearch = workout.name
       .toLowerCase()
       .includes(search.toLowerCase());
@@ -138,10 +138,7 @@ export default function Treinos() {
         borderRadius: 12,
         padding: 16,
         marginVertical: 8,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         elevation: 3,
       }}
     >

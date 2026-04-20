@@ -48,21 +48,24 @@ export default function AppNavigator() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (hasNavigated.current) return;
 
     if (!user) {
+      hasNavigated.current = false;
       router.replace("/login");
       hasNavigated.current = true;
       return;
     }
 
     if (convexUser === null) {
+      hasNavigated.current = false;
       router.replace("/login");
       hasNavigated.current = true;
       return;
     }
 
-    hasNavigated.current = true;
+    if (!hasNavigated.current) {
+      hasNavigated.current = true;
+    }
   }, [isLoading, user, convexUser]);
 
   if (isLoading) {

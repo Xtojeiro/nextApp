@@ -3,7 +3,7 @@ import useTheme from "@/hooks/useTheme";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
@@ -21,7 +21,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function Equipa() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const convexUser = useQuery(api.users.getCurrentUser);
+  const convexUser = useQuery(api.users.getCurrentUser as any);
+  const teamAthletes = useQuery(api.users.getTeamAthletes as any, convexUser?.role === "COACH" ? {} : "skip") || [];
+  const addNoteMutation = useMutation(api.users.addAthleteNote as any);
+
+  const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
+  const [showAthleteModal, setShowAthleteModal] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const [filterPosition, setFilterPosition] = useState<string>("");
 
   // Only show for COACH role
   if (convexUser?.role !== "COACH") {
@@ -41,26 +51,15 @@ export default function Equipa() {
     );
   }
 
-  const teamAthletes = useQuery(api.users.getTeamAthletes) || [];
-  const addNoteMutation = useMutation(api.users.addAthleteNote);
-  
-  const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
-  const [showAthleteModal, setShowAthleteModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
-  const [filterPosition, setFilterPosition] = useState<string>("");
-
   // Filter athletes
-  const filteredAthletes = teamAthletes.filter((athlete) => {
-    const matchesSearch = athlete.name.toLowerCase().includes(searchText.toLowerCase());
+  const filteredAthletes = teamAthletes.filter((athlete: any) => {
+    const matchesSearch = athlete.name?.toLowerCase().includes(searchText.toLowerCase());
     const matchesStatus = filterStatus === "all" || athlete.status === filterStatus;
     const matchesPosition = !filterPosition || athlete.position === filterPosition;
     return matchesSearch && matchesStatus && matchesPosition;
   });
 
-  const positions = [...new Set(teamAthletes.map(a => a.position))];
+  const positions: string[] = [...new Set(teamAthletes.map((a: any) => a.position).filter(Boolean) as string[])];
 
   const handleAddNote = async () => {
     if (!selectedAthlete || !noteText.trim()) return;
@@ -93,10 +92,7 @@ export default function Equipa() {
         borderRadius: 12,
         padding: 16,
         marginVertical: 8,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         elevation: 3,
       }}
       onPress={() => {
@@ -198,8 +194,8 @@ export default function Equipa() {
               Gestão de Atletas
             </Text>
             <Text style={{ color: colors.textMuted }}>
-              {teamAthletes.filter(a => a.status === "active").length} atletas ativos •{" "}
-              {teamAthletes.filter(a => a.status === "inactive").length} inativos
+              {teamAthletes.filter((a: any) => a.status === "active").length} atletas ativos •{" "}
+              {teamAthletes.filter((a: any) => a.status === "inactive").length} inativos
             </Text>
           </View>
 
@@ -267,7 +263,7 @@ export default function Equipa() {
                   Todas
                 </Text>
               </TouchableOpacity>
-              {positions.map((position) => (
+              {positions.map((position: string) => (
                 <TouchableOpacity
                   key={position}
                   style={{
@@ -294,8 +290,8 @@ export default function Equipa() {
 
           {/* Athletes List */}
           <FlatList
-            data={filteredAthletes}
-            keyExtractor={(item) => item.id}
+            data={filteredAthletes as any[]}
+            keyExtractor={(item: any) => (item as any).id}
             renderItem={renderAthleteCard}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}

@@ -6,6 +6,7 @@ export default defineSchema({
   users: defineTable({
     full_name: v.string(), // Changed from name to match existing data
     email: v.string(),
+    clerk_id: v.optional(v.string()), // Clerk authentication ID
     password_hash: v.optional(v.string()), // Changed to match existing data
     role: v.union(v.literal("PLAYER"), v.literal("COACH"), v.literal("SCOUT")), // Changed to match existing data
     avatar: v.optional(v.string()),
@@ -22,6 +23,7 @@ export default defineSchema({
     updated_at: v.number(),
   })
     .index("by_email", ["email"])
+    .index("by_clerk_id", ["clerk_id"])
     .index("by_role", ["role"]),
 
   // Players (extended user data for athletes)
@@ -262,4 +264,169 @@ export default defineSchema({
     .index("by_coachId", ["coachId"])
     .index("by_athleteId", ["athleteId"])
     .index("by_status", ["status"]),
+
+  // Game Stats (statistics per game per player)
+  gameStats: defineTable({
+    gameId: v.id("games"),
+    playerId: v.id("users"),
+    teamId: v.optional(v.id("teams")),
+    points: v.optional(v.number()),
+    assists: v.optional(v.number()),
+    rebounds: v.optional(v.number()),
+    minutesPlayed: v.optional(v.number()),
+    fouls: v.optional(v.number()),
+    steals: v.optional(v.number()),
+    blocks: v.optional(v.number()),
+    turnovers: v.optional(v.number()),
+    fieldGoalsMade: v.optional(v.number()),
+    fieldGoalsAttempted: v.optional(v.number()),
+    threePointersMade: v.optional(v.number()),
+    threePointersAttempted: v.optional(v.number()),
+    freeThrowsMade: v.optional(v.number()),
+    freeThrowsAttempted: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_gameId", ["gameId"])
+    .index("by_playerId", ["playerId"]),
+
+  // Notifications
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("message"),
+      v.literal("invite"),
+      v.literal("game"),
+      v.literal("workout"),
+      v.literal("follow"),
+      v.literal("report"),
+    ),
+    title: v.string(),
+    body: v.optional(v.string()),
+    data: v.optional(v.string()), // JSON with additional data
+    isRead: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_isRead", ["isRead"])
+    .index("by_createdAt", ["createdAt"]),
+
+  // Attendance
+  attendance: defineTable({
+    eventId: v.id("events"),
+    userId: v.id("users"),
+    status: v.union(
+      v.literal("present"),
+      v.literal("absent"),
+      v.literal("excused"),
+      v.literal("pending"),
+    ),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_eventId", ["eventId"])
+    .index("by_userId", ["userId"])
+    .index("by_status", ["status"]),
+
+  // Injuries
+  injuries: defineTable({
+    playerId: v.id("users"),
+    type: v.union(
+      v.literal("sprain"),
+      v.literal("strain"),
+      v.literal("fracture"),
+      v.literal("contusion"),
+      v.literal("dislocation"),
+      v.literal("other"),
+    ),
+    description: v.optional(v.string()),
+    bodyPart: v.optional(v.string()),
+    severity: v.union(v.literal("mild"), v.literal("moderate"), v.literal("severe")),
+    startDate: v.number(),
+    endDate: v.optional(v.number()),
+    status: v.union(v.literal("active"), v.literal("recovering"), v.literal("recovered")),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_playerId", ["playerId"])
+    .index("by_status", ["status"]),
+
+  // Group Conversations
+  groupConversations: defineTable({
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    adminId: v.id("users"),
+    avatar: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_adminId", ["adminId"]),
+
+  // Group Members
+  groupMembers: defineTable({
+    groupId: v.id("groupConversations"),
+    userId: v.id("users"),
+    role: v.union(v.literal("admin"), v.literal("member")),
+    joinedAt: v.number(),
+  })
+    .index("by_groupId", ["groupId"])
+    .index("by_userId", ["userId"]),
+
+  // Group Messages
+  groupMessages: defineTable({
+    groupId: v.id("groupConversations"),
+    senderId: v.id("users"),
+    content: v.string(),
+    createdAt: v.number(),
+    isRead: v.boolean(),
+  })
+    .index("by_groupId", ["groupId"])
+    .index("by_senderId", ["senderId"]),
+
+  // Achievements
+  achievements: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    criteria: v.optional(v.string()), // JSON defining how to earn
+    createdAt: v.number(),
+  }),
+
+  // User Achievements
+  userAchievements: defineTable({
+    userId: v.id("users"),
+    achievementId: v.id("achievements"),
+    earnedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_achievementId", ["achievementId"]),
+
+  // Seasons
+  seasons: defineTable({
+    name: v.string(),
+    startDate: v.number(),
+    endDate: v.number(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_active", ["isActive"]),
+
+  // League
+  league: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    seasonId: v.optional(v.id("seasons")),
+    createdAt: v.number(),
+  }).index("by_seasonId", ["seasonId"]),
+
+  // League Teams
+  leagueTeams: defineTable({
+    leagueId: v.id("league"),
+    teamId: v.id("teams"),
+    wins: v.optional(v.number()),
+    losses: v.optional(v.number()),
+    draws: v.optional(v.number()),
+    points: v.optional(v.number()),
+    rank: v.optional(v.number()),
+  })
+    .index("by_leagueId", ["leagueId"])
+    .index("by_teamId", ["teamId"]),
 });

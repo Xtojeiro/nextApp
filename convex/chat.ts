@@ -52,10 +52,39 @@ export const getConversations = query({
           .order("desc")
           .take(1);
 
+        // Count unread messages
+        const allMessages = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation_id", (q) =>
+            q.eq("conversation_id", conversation._id),
+          )
+          .collect();
+
+        const unreadCount = allMessages.filter(
+          (m) => !m.is_read && m.sender_id !== user._id,
+        ).length;
+
         return {
-          ...conversation,
-          otherParticipant,
-          lastMessage: messages[0] || null,
+          id: conversation._id,
+          _id: conversation._id,
+          otherUser: otherParticipant
+            ? {
+                id: otherParticipant._id,
+                _id: otherParticipant._id,
+                full_name: otherParticipant.full_name,
+                avatar_url: otherParticipant.avatar,
+              }
+            : null,
+          lastMessage: messages[0]
+            ? {
+                ...messages[0],
+                id: messages[0]._id,
+                created_at: messages[0].created_at,
+              }
+            : null,
+          unreadCount,
+          created_at: conversation.created_at,
+          updated_at: conversation.updated_at,
         };
       }),
     );
@@ -107,10 +136,17 @@ export const getMessages = query({
       messages.map(async (message) => {
         const sender = await ctx.db.get(message.sender_id);
         return {
-          ...message,
+          id: message._id,
+          _id: message._id,
+          sender_id: message.sender_id,
+          conversation_id: message.conversation_id,
+          content: message.content,
+          created_at: message.created_at,
+          is_read: message.is_read,
           sender: sender
             ? {
                 _id: sender._id,
+                id: sender._id,
                 name: sender.full_name,
                 avatar: sender.avatar,
               }
@@ -205,7 +241,58 @@ export const sendMessage = mutation({
       updated_at: timestamp,
     });
 
-    return { success: true, messageId };
+    return { success: true, messageId, conversationId };
+  },
+});
+
+// Create new conversation (for starting new chats)
+export const createConversation = mutation({
+  args: {
+    recipientId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const sender = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first();
+
+    if (!sender) {
+      throw new Error("User not found");
+    }
+
+    if (sender._id === args.recipientId) {
+      throw new Error("Cannot start conversation with yourself");
+    }
+
+    // Check if conversation already exists
+    const allConversations = await ctx.db.query("conversations").collect();
+
+    const existingConversation = allConversations.find(
+      (conv) =>
+        (conv.user_one_id === sender._id &&
+          conv.user_two_id === args.recipientId) ||
+        (conv.user_one_id === args.recipientId &&
+          conv.user_two_id === sender._id),
+    );
+
+    if (existingConversation) {
+      return { success: true, conversationId: existingConversation._id };
+    }
+
+    // Create new conversation
+    const conversationId = await ctx.db.insert("conversations", {
+      user_one_id: sender._id,
+      user_two_id: args.recipientId,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+
+    return { success: true, conversationId };
   },
 });
 
@@ -378,6 +465,7 @@ export const getBlockedUsers = query({
         return blockedUser
           ? {
               _id: blockedUser._id,
+              id: blockedUser._id,
               name: blockedUser.full_name,
               avatar: blockedUser.avatar,
               blockedAt: relation.createdAt,
@@ -387,5 +475,61 @@ export const getBlockedUsers = query({
     );
 
     return blockedUsers.filter(Boolean);
+  },
+});
+
+// Search users to start conversation
+export const searchUsersToMessage = query({
+  args: {
+    searchQuery: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first();
+
+    if (!currentUser) {
+      return [];
+    }
+
+    // Get blocked users
+    const blockedRelations = await ctx.db
+      .query("blockedUsers")
+      .withIndex("by_blockerId", (q) => q.eq("blockerId", currentUser._id))
+      .collect();
+    
+    const blockedIds = new Set(blockedRelations.map((r) => r.blockedId));
+
+    // Search users
+    const allUsers = await ctx.db.query("users").collect();
+    
+    const searchLower = args.searchQuery.toLowerCase();
+    const filteredUsers = allUsers
+      .filter((u) => {
+        // Exclude current user and blocked users
+        if (u._id === currentUser._id) return false;
+        if (blockedIds.has(u._id)) return false;
+        
+        // Search by name or email
+        const nameMatch = u.full_name?.toLowerCase().includes(searchLower);
+        const emailMatch = u.email?.toLowerCase().includes(searchLower);
+        return nameMatch || emailMatch;
+      })
+      .map((u) => ({
+        id: u._id,
+        _id: u._id,
+        full_name: u.full_name,
+        email: u.email,
+        avatar_url: u.avatar,
+        role: u.role,
+      }));
+
+    return filteredUsers.slice(0, 20);
   },
 });

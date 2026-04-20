@@ -113,8 +113,8 @@ export default function TreinadorDashboard() {
           </Text>
           <CoachAnalytics
             athletes={mockAthletes}
-            onAthletePress={(athlete) => console.log("Athlete:", athlete.name)}
-            onExportPress={() => console.log("Export analytics")}
+            onAthletePress={(athlete) => {}}
+            onExportPress={() => {}}
           />
 
           <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.text, marginTop: 8, marginBottom: 16 }}>
@@ -131,7 +131,7 @@ export default function TreinadorDashboard() {
           </Text>
           <PDFReportGenerator
             data={reportData}
-            onExport={(format) => console.log("Export:", format)}
+            onExport={() => {}}
           />
         </ScrollView>
       </SafeAreaView>

@@ -11,7 +11,7 @@ export const getGames = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error('Not authenticated');
+      return [];
     }
 
     const user = await ctx.db
@@ -20,7 +20,7 @@ export const getGames = query({
       .first();
 
     if (!user) {
-      throw new Error('User not found');
+      return [];
     }
 
     let games;

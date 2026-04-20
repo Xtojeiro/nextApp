@@ -15,10 +15,7 @@ export default function LoadingSpinner() {
           borderRadius: 40,
           justifyContent: "center",
           alignItems: "center",
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          boxShadow: `0 2px 4px ${colors.shadow}`,
           elevation: 3,
         }}
       >

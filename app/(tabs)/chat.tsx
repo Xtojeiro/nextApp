@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -27,24 +28,30 @@ export default function ChatTab() {
   const [messageText, setMessageText] = useState("");
   const [view, setView] = useState<"list" | "chat">("list");
 
-  const conversations = useQuery(
-    api.chat.getConversations,
-    user ? {} : "skip",
-  );
+  // New chat modal
+  const [newChatModalVisible, setNewChatModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const conversations = useQuery(api.chat.getConversations, user ? {} : "skip");
   const messages = useQuery(
     api.chat.getMessages,
     selectedConversation
       ? { conversationId: selectedConversation.id as any }
       : "skip",
   );
+
+  // Search for users to message
+  const searchResults = useQuery(
+    api.chat.searchUsersToMessage,
+    searchQuery.length >= 2 ? { searchQuery } : "skip",
+  );
+
   const sendMessage = useMutation(api.chat.sendMessage);
+  const createConversation = useMutation(api.chat.createConversation);
   const markAsRead = useMutation(api.chat.markMessagesAsRead);
   const blockUser = useMutation(api.chat.blockUser);
   const unblockUser = useMutation(api.chat.unblockUser);
-  const blockedUsers = useQuery(
-    api.chat.getBlockedUsers,
-    user ? {} : "skip",
-  );
+  const blockedUsers = useQuery(api.chat.getBlockedUsers, user ? {} : "skip");
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedConversation || !user) return;
@@ -53,7 +60,7 @@ export default function ChatTab() {
       await sendMessage({
         conversationId: selectedConversation.id as any,
         content: messageText.trim(),
-      });
+      } as any);
       setMessageText("");
     } catch (error) {
       Alert.alert("Error", "Failed to send message");
@@ -70,13 +77,40 @@ export default function ChatTab() {
     if (user) {
       markAsRead({
         conversationId: conversation.id as any,
-      });
+      } as any);
     }
   };
 
   const handleBackToList = () => {
     setView("list");
     setSelectedConversation(null);
+  };
+
+  const handleNewChat = () => {
+    setNewChatModalVisible(true);
+  };
+
+  const handleStartConversation = async (recipientId: string) => {
+    try {
+      const result = await createConversation({
+        recipientId: recipientId as any,
+      });
+      setNewChatModalVisible(false);
+      setSearchQuery("");
+
+      // Navigate to the new conversation
+      const userResult = searchResults?.find((u: any) => u.id === recipientId);
+      if (userResult && result.conversationId) {
+        setSelectedConversation({
+          id: result.conversationId,
+          otherUserId: recipientId,
+          otherUser: userResult,
+        });
+        setView("chat");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to start conversation");
+    }
   };
 
   const formatTime = (timestamp: number) => {
@@ -124,7 +158,7 @@ export default function ChatTab() {
             source={{
               uri:
                 selectedConversation.otherUser.avatar_url ||
-                "https://via.placeholder.com/40",
+                "https://placehold.co/40x40",
             }}
             style={styles.chatAvatar}
           />
@@ -135,17 +169,17 @@ export default function ChatTab() {
             style={styles.blockButton}
             onPress={async () => {
               const isBlocked = blockedUsers?.some(
-                (b) => b._id === selectedConversation.otherUserId,
+                (b: any) => b?._id === selectedConversation.otherUserId,
               );
               try {
                 if (isBlocked) {
                   await unblockUser({
                     userId: selectedConversation.otherUserId as any,
-                  });
+                  } as any);
                 } else {
                   await blockUser({
                     userId: selectedConversation.otherUserId as any,
-                  });
+                  } as any);
                 }
               } catch (error) {
                 Alert.alert("Error", "Failed to update block status");
@@ -247,7 +281,8 @@ export default function ChatTab() {
             <Image
               source={{
                 uri:
-                  item.otherUser.avatar_url || "https://via.placeholder.com/50",
+                  item?.otherUser?.avatar_url ||
+                  "https://placehold.co/50x50",
               }}
               style={styles.avatar}
             />
@@ -257,13 +292,13 @@ export default function ChatTab() {
                   style={[
                     styles.conversationName,
                     { color: colors.text },
-                    item.unreadCount > 0 && styles.unreadText,
+                    (item?.unreadCount ?? 0) > 0 && styles.unreadText,
                   ]}
                 >
-                  {item.otherUser.full_name}
+                  {item?.otherUser?.full_name || "Unknown"}
                 </Text>
                 <Text style={[styles.time, { color: colors.textMuted }]}>
-                  {item.lastMessage
+                  {item?.lastMessage
                     ? formatTime(item.lastMessage.created_at)
                     : ""}
                 </Text>
@@ -273,25 +308,111 @@ export default function ChatTab() {
                   style={[
                     styles.lastMessage,
                     { color: colors.textMuted },
-                    item.unreadCount > 0 && [
+                    (item?.unreadCount ?? 0) > 0 && [
                       styles.unreadText,
                       { color: colors.text },
                     ],
                   ]}
                   numberOfLines={1}
                 >
-                  {item.lastMessage?.content || "No messages"}
+                  {item?.lastMessage?.content || "No messages"}
                 </Text>
-                {item.unreadCount > 0 && <View style={styles.unreadDot} />}
+                {(item?.unreadCount ?? 0) > 0 && (
+                  <View style={styles.unreadDot} />
+                )}
               </View>
             </View>
           </TouchableOpacity>
         )}
         style={styles.list}
       />
-      <TouchableOpacity style={styles.floatingButton}>
+      <TouchableOpacity style={styles.floatingButton} onPress={handleNewChat}>
         <Ionicons name="create-outline" size={24} color="#fff" />
       </TouchableOpacity>
+
+      {/* New Chat Modal */}
+      <Modal
+        visible={newChatModalVisible}
+        animationType="slide"
+        onRequestClose={() => setNewChatModalVisible(false)}
+      >
+        <LinearGradient
+          colors={colors.gradients.background}
+          style={{ flex: 1 }}
+        >
+          <View
+            style={[styles.modalHeader, { backgroundColor: colors.surface }]}
+          >
+            <TouchableOpacity onPress={() => setNewChatModalVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              New Message
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <View style={{ padding: 16 }}>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search users..."
+              placeholderTextColor={colors.textMuted}
+            />
+          </View>
+
+          <FlatList
+            data={searchResults || []}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.conversationItem,
+                  { borderBottomColor: colors.border },
+                ]}
+                onPress={() => handleStartConversation(item.id)}
+              >
+                <Image
+                  source={{
+                    uri: item.avatar_url || "https://placehold.co/50x50",
+                  }}
+                  style={styles.avatar}
+                />
+                <View style={styles.conversationContent}>
+                  <Text
+                    style={[styles.conversationName, { color: colors.text }]}
+                  >
+                    {item.full_name}
+                  </Text>
+                  <Text
+                    style={[styles.lastMessage, { color: colors.textMuted }]}
+                  >
+                    {item.email}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            style={{ flex: 1 }}
+            ListEmptyComponent={
+              <View style={{ padding: 20, alignItems: "center" }}>
+                <Text style={{ color: colors.textMuted }}>
+                  {searchQuery.length >= 2
+                    ? "No users found"
+                    : "Type at least 2 characters to search"}
+                </Text>
+              </View>
+            }
+          />
+        </LinearGradient>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -300,6 +421,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 50,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
   },
   floatingButton: {
     position: "absolute",
@@ -312,10 +445,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: "0 2px 3.84px rgba(0,0,0,0.25)",
   },
   list: {
     flex: 1,

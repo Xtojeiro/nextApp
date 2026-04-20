@@ -1,0 +1,876 @@
+{
+  "version": "1.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "detailLevel": "All",
+  "tablePositions": [
+    {
+      "name": "users",
+      "schemaName": "public",
+      "x": -966.0251507704827,
+      "y": 1499.3476245442178
+    },
+    {
+      "name": "players",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 12
+    },
+    {
+      "name": "coaches",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 538
+    },
+    {
+      "name": "teams",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 53
+    },
+    {
+      "name": "workouts",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 356
+    },
+    {
+      "name": "workoutLogs",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 1302
+    },
+    {
+      "name": "games",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 808
+    },
+    {
+      "name": "events",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 786
+    },
+    {
+      "name": "trainingPlans",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 1216
+    },
+    {
+      "name": "trainingPlan_workouts",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 1604
+    },
+    {
+      "name": "conversations",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 1646
+    },
+    {
+      "name": "messages",
+      "schemaName": "public",
+      "x": 1018.9189453125,
+      "y": 1778
+    },
+    {
+      "name": "blockedUsers",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 1948
+    },
+    {
+      "name": "follows",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 2186
+    },
+    {
+      "name": "posts",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 2392
+    },
+    {
+      "name": "scoutReports",
+      "schemaName": "public",
+      "x": 468.2392578125,
+      "y": 2758
+    },
+    {
+      "name": "invites",
+      "schemaName": "public",
+      "x": 2712.3452426787894,
+      "y": 1170.7731895891727
+    },
+    {
+      "name": "gameStats",
+      "schemaName": "public",
+      "x": 3158.4264076306554,
+      "y": 1919.8016425287894
+    },
+    {
+      "name": "notifications",
+      "schemaName": "public",
+      "x": 2789.4328415004243,
+      "y": 2515.674046324363
+    },
+    {
+      "name": "attendance",
+      "schemaName": "public",
+      "x": 2521.227830517913,
+      "y": 1490.0800396019051
+    },
+    {
+      "name": "injuries",
+      "schemaName": "public",
+      "x": 2772.510545361663,
+      "y": 1490.0800396019051
+    },
+    {
+      "name": "groupConversations",
+      "schemaName": "public",
+      "x": 1950.603318799163,
+      "y": 2180.080039601904
+    },
+    {
+      "name": "groupMembers",
+      "schemaName": "public",
+      "x": 2269.945115674163,
+      "y": 1828.0800396019038
+    },
+    {
+      "name": "groupMessages",
+      "schemaName": "public",
+      "x": 2521.227830517913,
+      "y": 1764.080039601904
+    },
+    {
+      "name": "achievements",
+      "schemaName": "public",
+      "x": 2772.510545361663,
+      "y": 1956.0800396019038
+    },
+    {
+      "name": "userAchievements",
+      "schemaName": "public",
+      "x": 1950.603318799163,
+      "y": 2486.080039601904
+    },
+    {
+      "name": "seasons",
+      "schemaName": "public",
+      "x": 2269.945115674163,
+      "y": 2070.080039601904
+    },
+    {
+      "name": "league",
+      "schemaName": "public",
+      "x": 2521.227830517913,
+      "y": 2038.0800396019038
+    },
+    {
+      "name": "leagueTeams",
+      "schemaName": "public",
+      "x": 2772.510545361663,
+      "y": 2230.080039601904
+    }
+  ],
+  "tableGroupCollapseStates": [],
+  "stickyNoteLayouts": [],
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "players",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "teamId"
+      ],
+      "secondTableName": "players",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "coachId"
+      ],
+      "secondTableName": "players",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "coaches",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "teamId"
+      ],
+      "secondTableName": "coaches",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "coachId"
+      ],
+      "secondTableName": "teams",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "workouts",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "workoutLogs",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "workouts",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "workoutId"
+      ],
+      "secondTableName": "workoutLogs",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "team1Id"
+      ],
+      "secondTableName": "games",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "team2Id"
+      ],
+      "secondTableName": "games",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "createdBy"
+      ],
+      "secondTableName": "games",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "events",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "coachId"
+      ],
+      "secondTableName": "trainingPlans",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "trainingPlans",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "trainingPlanId"
+      ],
+      "secondTableName": "trainingPlan_workouts",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "workouts",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "workoutId"
+      ],
+      "secondTableName": "trainingPlan_workouts",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_one_id"
+      ],
+      "secondTableName": "conversations",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_two_id"
+      ],
+      "secondTableName": "conversations",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "conversations",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "conversation_id"
+      ],
+      "secondTableName": "messages",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "sender_id"
+      ],
+      "secondTableName": "messages",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "blockerId"
+      ],
+      "secondTableName": "blockedUsers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "blockedId"
+      ],
+      "secondTableName": "blockedUsers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "follower_id"
+      ],
+      "secondTableName": "follows",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "following_id"
+      ],
+      "secondTableName": "follows",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "posts",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "scoutId"
+      ],
+      "secondTableName": "scoutReports",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "athleteId"
+      ],
+      "secondTableName": "scoutReports",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "coachId"
+      ],
+      "secondTableName": "invites",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "athleteId"
+      ],
+      "secondTableName": "invites",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "games",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "gameId"
+      ],
+      "secondTableName": "gameStats",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "playerId"
+      ],
+      "secondTableName": "gameStats",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "teamId"
+      ],
+      "secondTableName": "gameStats",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "notifications",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "events",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "eventId"
+      ],
+      "secondTableName": "attendance",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "attendance",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "playerId"
+      ],
+      "secondTableName": "injuries",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "adminId"
+      ],
+      "secondTableName": "groupConversations",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "groupConversations",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "groupId"
+      ],
+      "secondTableName": "groupMembers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "groupMembers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "groupConversations",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "groupId"
+      ],
+      "secondTableName": "groupMessages",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "senderId"
+      ],
+      "secondTableName": "groupMessages",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "userId"
+      ],
+      "secondTableName": "userAchievements",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "achievements",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "achievementId"
+      ],
+      "secondTableName": "userAchievements",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "seasons",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "seasonId"
+      ],
+      "secondTableName": "league",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "league",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "leagueId"
+      ],
+      "secondTableName": "leagueTeams",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "_id"
+      ],
+      "firstTableName": "teams",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "teamId"
+      ],
+      "secondTableName": "leagueTeams",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    }
+  ]
+}

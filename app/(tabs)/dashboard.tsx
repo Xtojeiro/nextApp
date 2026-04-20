@@ -1132,9 +1132,9 @@ export default function Dashboard() {
   const { user } = useAuth();
   const convexUser = useQuery(api.users.getCurrentUser);
 
-  const workoutLogs = useQuery(api.workouts.getWorkoutLogs, convexUser ? {} : "skip") || [];
-  const events = useQuery(api.events.getEvents, convexUser ? {} : "skip") || [];
-  const playerStats = useQuery(api.users.getPlayerStats, convexUser ? {} : "skip") || {
+  const workoutLogs = useQuery(api.workouts.getWorkoutLogs as any, convexUser ? {} : "skip") || [];
+  const events = useQuery(api.events.getEvents as any, convexUser ? {} : "skip") || [];
+  const playerStats: any = useQuery(api.users.getPlayerStats as any, convexUser ? {} : "skip") || {
     totalWorkouts: 0,
     totalGames: 0,
     weeklyFrequency: 0,
@@ -1142,7 +1142,7 @@ export default function Dashboard() {
     currentStreak: 0,
     bestStreak: 0,
   };
-  const coachDashboard = useQuery(api.users.getCoachDashboard, convexUser?.role === "COACH" ? {} : "skip") || {
+  const coachDashboard = useQuery(api.users.getCoachDashboard as any, convexUser?.role === "COACH" ? {} : "skip") || {
     totalAthletes: 0,
     activeAthletes: 0,
     inactiveAthletes: 0,
@@ -1151,10 +1151,10 @@ export default function Dashboard() {
     upcomingGames: 0,
     lowActivityAlerts: 0,
   };
-  const teamAthletes = useQuery(api.users.getTeamAthletes, convexUser?.role === "COACH" ? {} : "skip") || [];
-  const createEventMutation = useMutation(api.events.createEvent);
-  const updateEventMutation = useMutation(api.events.updateEvent);
-  const deleteEventMutation = useMutation(api.events.deleteEvent);
+  const teamAthletes = useQuery(api.users.getTeamAthletes as any, convexUser?.role === "COACH" ? {} : "skip") || [];
+  const createEventMutation = useMutation(api.events.createEvent as any);
+  const updateEventMutation = useMutation(api.events.updateEvent as any);
+  const deleteEventMutation = useMutation(api.events.deleteEvent as any);
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -1169,21 +1169,21 @@ export default function Dashboard() {
     thisWeek.setDate(now.getDate() - now.getDay());
 
     const totalActivities =
-      workoutLogs.length + events.filter((e) => new Date(e.date) <= now).length;
+      workoutLogs.length + events.filter((e: any) => new Date(e.date) <= now).length;
 
     const monthActivities =
-      workoutLogs.filter((log) => new Date(log.completed_at) >= thisMonth)
+      workoutLogs.filter((log: any) => new Date(log.completedDate) >= thisMonth)
         .length +
       events.filter(
-        (event) =>
+        (event: any) =>
           new Date(event.date) >= thisMonth && new Date(event.date) <= now,
       ).length;
 
     const weekActivities =
-      workoutLogs.filter((log) => new Date(log.completed_at) >= thisWeek)
+      workoutLogs.filter((log: any) => new Date(log.completedDate) >= thisWeek)
         .length +
       events.filter(
-        (event) =>
+        (event: any) =>
           new Date(event.date) >= thisWeek && new Date(event.date) <= now,
       ).length;
 
@@ -1197,9 +1197,9 @@ export default function Dashboard() {
 
       const hasActivity =
         workoutLogs.some(
-          (log) =>
-            new Date(log.completed_at).toISOString().split("T")[0] === dateStr,
-        ) || events.some((event) => event.date === dateStr);
+          (log: any) =>
+            new Date(log.completedDate).toISOString().split("T")[0] === dateStr,
+        ) || events.some((event: any) => event.date === dateStr);
 
       if (hasActivity) {
         streak++;

@@ -22,27 +22,25 @@ import {
 
 export default function Profile() {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, isSignedIn } = useAuth();
   const { t, i18n } = useTranslation();
   const router = useRouter();
+
+  const updateUser = useMutation(api.users.updateUser as any);
+  const generateUploadUrl = useMutation(api.users.generateUploadUrl as any);
+  const updateAvatar = useMutation(api.users.updateAvatar as any);
+  const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility as any);
+  const profileVisibility = useQuery(api.users.getProfileVisibility as any, {});
+  const deleteAccount = useMutation(api.users.deleteAccount as any);
+  const achievements = useQuery(api.achievements.getByUserId as any, user ? { userId: user.id as any } : "skip");
+  const allAchievements = useQuery(api.achievements.getAll as any) || [];
+  const followersCount = useQuery(api.follows.getFollowersCount as any, user ? { userId: user.id as any } : "skip");
+  const followingCount = useQuery(api.follows.getFollowingCount as any, user ? { userId: user.id as any } : "skip");
 
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.fullName || "");
   const [editBio, setEditBio] = useState("");
-
-  const followersCount = user
-    ? useQuery(api.follows.getFollowersCount, { userId: user.id as any })
-    : null;
-  const followingCount = user
-    ? useQuery(api.follows.getFollowingCount, { userId: user.id as any })
-    : null;
-
-  const updateUser = useMutation(api.users.updateUser);
-  const generateUploadUrl = useMutation(api.users.generateUploadUrl);
-  const updateAvatar = useMutation(api.users.updateAvatar);
-  const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility);
-  const profileVisibility = useQuery(api.users.getProfileVisibility);
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -89,7 +87,15 @@ export default function Profile() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => console.log("Delete account"),
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              await logout();
+              router.replace("/login");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete account");
+            }
+          },
         },
       ],
     );
@@ -98,8 +104,7 @@ export default function Profile() {
   const handleEditProfile = async () => {
     try {
       await updateUser({
-        userId: user!.id as any,
-        full_name: editName,
+        name: editName,
         bio: editBio,
       });
       setEditModalVisible(false);
@@ -150,7 +155,7 @@ export default function Profile() {
                 uri:
                   user?.profileImageBase64 ||
                   user?.avatar_url ||
-                  "https://via.placeholder.com/150",
+                  "https://placehold.co/150x150",
               }}
               style={styles.avatar}
             />
@@ -198,6 +203,30 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        {/* Achievements Section */}
+        {(achievements && achievements.length > 0) && (
+          <View style={styles.achievementsSection}>
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>
+              Achievements
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {achievements.map((achievement: any, index: number) => (
+                <View key={index} style={[styles.achievementCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={[styles.achievementIcon, { backgroundColor: colors.primary }]}>
+                    <Ionicons name="trophy" size={24} color="#fff" />
+                  </View>
+                  <Text style={[styles.achievementName, { color: colors.text }]}>
+                    {achievement.name}
+                  </Text>
+                  <Text style={[styles.achievementDescription, { color: colors.textMuted }]}>
+                    {achievement.description}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </ScrollView>
       <TouchableOpacity
         style={styles.floatingButton}
@@ -307,6 +336,48 @@ export default function Profile() {
               </TouchableOpacity>
             </View>
 
+            {/* Notifications Section */}
+            <View
+              style={[
+                styles.section,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Notifications
+              </Text>
+              <TouchableOpacity style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  Push Notifications
+                </Text>
+                <Ionicons name="toggle" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  Game Reminders
+                </Text>
+                <Ionicons name="toggle" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  Training Reminders
+                </Text>
+                <Ionicons name="toggle" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  New Messages
+                </Text>
+                <Ionicons name="toggle" size={32} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>
+                  New Followers
+                </Text>
+                <Ionicons name="toggle" size={32} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
             {/* Account Section */}
             <View
               style={[
@@ -332,7 +403,7 @@ export default function Profile() {
                   <Image
                     source={{
                       uri:
-                        user?.avatar_url || "https://via.placeholder.com/150",
+                        user?.avatar_url || "https://placehold.co/150x150",
                     }}
                     style={styles.avatarSmall}
                   />
@@ -404,12 +475,12 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.security.title")}
               </Text>
-              <TouchableOpacity style={styles.button}>
+              <TouchableOpacity style={styles.button} activeOpacity={0.7}>
                 <Text style={[styles.buttonText, { color: colors.primary }]}>
                   {t("settings.security.changePassword")}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={handleLogout}>
+              <TouchableOpacity style={styles.button} onPress={handleLogout} activeOpacity={0.7}>
                 <Text style={[styles.buttonText, { color: colors.danger }]}>
                   {t("settings.security.logout")}
                 </Text>
@@ -429,6 +500,7 @@ export default function Profile() {
               <TouchableOpacity
                 style={styles.button}
                 onPress={handleDeleteAccount}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.buttonText, { color: colors.danger }]}>
                   {t("settings.privacy.deleteAccount")}
@@ -526,10 +598,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: "0 2px 3.84px rgba(0,0,0,0.25)",
   },
   profileSection: {
     padding: 16,
@@ -580,6 +649,41 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 14,
+  },
+  achievementsSection: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  sectionHeader: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  achievementCard: {
+    width: 140,
+    padding: 12,
+    borderRadius: 12,
+    marginRight: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  achievementIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  achievementName: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  achievementDescription: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 4,
   },
   modalHeader: {
     flexDirection: "row",

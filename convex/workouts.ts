@@ -21,10 +21,6 @@ handler: async (ctx, args) => {
       return [];
     }
 
-    if (!user) {
-      return [];
-    }
-
     const logs = await ctx.db
       .query('workoutLogs')
       .withIndex('by_userId', (q) => q.eq('userId', user._id))

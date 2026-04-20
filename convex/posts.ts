@@ -205,3 +205,43 @@ export const addComment = mutation({
     return { success: true };
   },
 });
+
+export const getPostsWithUsers = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    
+    const allPosts = await ctx.db.query("posts").collect();
+    allPosts.sort((a, b) => b.created_at - a.created_at);
+    
+    const postsWithUsers = await Promise.all(
+      allPosts.slice(0, args.limit || 50).map(async (post) => {
+        const user = await ctx.db.get(post.user_id);
+        const likesCount = post.likes?.length || 0;
+        const commentsCount = post.comments?.length || 0;
+        
+        let isLiked = false;
+        if (identity && user) {
+          isLiked = post.likes?.includes(identity.subject) || false;
+        }
+        
+        return {
+          ...post,
+          user: user ? {
+            _id: user._id,
+            full_name: user.full_name,
+            avatar: user.avatar,
+            role: user.role,
+          } : null,
+          likesCount,
+          commentsCount,
+          isLiked,
+        };
+      })
+    );
+    
+    return postsWithUsers;
+  },
+});

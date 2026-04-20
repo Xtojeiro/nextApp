@@ -43,12 +43,23 @@
       "title": "Criar Conta",
       "subtitle": "Junte-se a nós hoje",
       "button": "Registar",
-      "hasAccount": "Já tem conta? Entrar"
+      "hasAccount": "Já tem conta? Entrar",
+      "step1": "Informação Pessoal",
+      "step2": "Tipo de Conta",
+      "step3": "Credenciais"
+    },
+    "accountTypes": {
+      "player": "Jogador",
+      "coach": "Treinador",
+      "scout": "Olheiro"
     },
     "fullName": "Nome Completo",
     "email": "Email",
     "password": "Palavra-passe",
-    "confirmPassword": "Confirmar Palavra-passe"
+    "confirmPassword": "Confirmar Palavra-passe",
+    "age": "Idade",
+    "next": "Seguinte",
+    "back": "Voltar"
   },
   "tabs": {
     "dashboard": "Dashboard",
@@ -60,7 +71,29 @@
   },
   "feed": {
     "title": "Feed",
-    "subtitle": "Últimas atualizações do clube"
+    "subtitle": "Últimas atualizações do clube",
+    "createPost": "Criar Publicação",
+    "whatsOnYourMind": "Em que estás a pensar?",
+    "post": "Publicar",
+    "noPosts": "Ainda sem publicações",
+    "noPostsSubtitle": "Seja o primeiro a partilhar algo com a comunidade!",
+    "comments": "Comentários",
+    "addComment": "Adicionar um comentário...",
+    "noComments": "Ainda sem comentários. Seja o primeiro a comentar!",
+    "deletePost": "Apagar Publicação",
+    "deleteConfirm": "Tem a certeza que deseja apagar esta publicação?",
+    "searchUsers": "Pesquisar Utilizadores"
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Melhores desempenhos esta época",
+    "goals": "Golos",
+    "assists": "Assistências",
+    "games": "Jogos",
+    "points": "Pontos",
+    "rebounds": "Rebatimentos",
+    "noRankings": "Ainda sem Rankings",
+    "noRankingsSubtitle": "Os rankings aparecerão aqui quando os jogadores tiverem estatísticas registadas."
   },
   "treinos": {
     "title": "Treinos",
@@ -120,7 +153,26 @@
     "save": "Salvar",
     "cancel": "Cancelar"
   },
-"dashboard": {
+"team": {
+    "title": "Minha Equipa",
+    "createTeam": "Criar Equipa",
+    "teamName": "Nome da Equipa",
+    "description": "Descrição",
+    "athletes": "Atletas",
+    "noAthletes": "Ainda sem atletas",
+    "noTeam": "Ainda sem Equipa",
+    "noTeamSubtitle": "Crie a sua equipa para começar a gerir atletas.",
+    "noTeamYet": "Ainda sem equipa",
+    "createTeamButton": "Criar Equipa",
+    "removeAthlete": "Remover Atleta",
+    "removeConfirm": "Tem a certeza que deseja remover este atleta da equipa?",
+    "games": "Jogos",
+    "wins": "Vitórias",
+    "losses": "Derrotas",
+    "statistics": "Estatísticas",
+    "profile": "Perfil do Atleta"
+  },
+  "dashboard": {
     "title": "Dashboard",
     "subtitle": "Visão geral da sua atividade desportiva",
     "activityHeatmap": "Mapa de Atividade",
@@ -175,6 +227,21 @@
     "delete": "Apagar",
     "edit": "Editar",
     "save": "Salvar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "next": "Seguinte",
+    "back": "Voltar"
+  },
+  "validation": {
+    "emailRequired": "Email é obrigatório",
+    "invalidEmail": "Email inválido",
+    "passwordRequired": "Palavra-passe é obrigatória",
+    "passwordMinLength": "Palavra-passe deve ter pelo menos 8 caracteres",
+    "confirmPasswordRequired": "Confirmação de palavra-passe é obrigatória",
+    "passwordsNotMatch": "As palavras-passe não coincidem",
+    "nameRequired": "Nome é obrigatório",
+    "nameMinLength": "Nome deve ter pelo menos 2 caracteres",
+    "ageRequired": "Idade é obrigatória",
+    "ageInvalid": "Idade inválida",
+    "fieldRequired": "Este campo é obrigatório"
   }
 }
