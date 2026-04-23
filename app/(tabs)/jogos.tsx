@@ -1,14 +1,15 @@
 import { api } from "@/convex/_generated/api";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
+  Modal,
   StatusBar,
   Text,
   TextInput,
@@ -17,176 +18,251 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type Game = {
-  _id: any;
-  opponent: any;
-  location: any;
-  date: any;
-  time: any;
-  home_or_away: any;
-  result_scored?: number;
-  result_conceded?: number;
-  minutes_played?: number;
-  position?: string;
-  goals?: number;
-  assists?: number;
-  analysis?: string;
-  notes?: string;
-  status: any;
-  [key: string]: any;
+type Team = Doc<"teams">;
+type GameWithTeams = Doc<"games"> & {
+  team1: Team | null;
+  team2: Team | null;
+  creator: { _id: Id<"users">; full_name: string } | null;
+};
+
+const emptyCreateForm = {
+  name: "",
+  opponentTeamId: "" as string,
+  location: "",
+  date: "",
+  notes: "",
+};
+
+const emptyEditForm = {
+  location: "",
+  date: "",
+  notes: "",
+  score1: "",
+  score2: "",
+  status: "scheduled" as "scheduled" | "in_progress" | "completed" | "cancelled",
 };
 
 export default function Jogos() {
   const { colors } = useTheme();
-  const { t } = useTranslation();
   const { user } = useAuth();
-  const convexUser = useQuery(api.users.getCurrentUser as any);
-  const games = useQuery(api.games.getGames as any, {}) || [];
-  const createGameMutation = useMutation(api.games.createGame as any);
-  const updateGameMutation = useMutation(api.games.updateGame as any);
-  const deleteGameMutation = useMutation(api.games as any);
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
+  );
+  const team = useQuery(
+    api.teams.getTeam,
+    convexUser ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const opponentTeams =
+    useQuery(
+      api.teams.listTeams,
+      team ? { excludeTeamId: team._id } : {},
+    ) || [];
+  const gamesQuery = useQuery(
+    api.games.getGames,
+    convexUser && team
+      ? { sessionUserId: convexUser._id, teamId: team._id }
+      : "skip",
+  );
+  const games: GameWithTeams[] = gamesQuery ?? [];
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const createGame = useMutation(api.games.createGame);
+  const updateGame = useMutation(api.games.updateGame);
+  const deleteGame = useMutation(api.games.deleteGame);
 
-  const [createFormData, setCreateFormData] = useState({
-    opponent: "",
-    location: "",
-    date: "",
-    time: "",
-    home_or_away: "home" as "home" | "away",
-  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<GameWithTeams | null>(null);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [editForm, setEditForm] = useState(emptyEditForm);
 
-  const [updateFormData, setUpdateFormData] = useState({
-    result_scored: "",
-    result_conceded: "",
-    minutes_played: "",
-    position: "",
-    goals: "",
-    assists: "",
-    analysis: "",
-    notes: "",
-  });
+  const sortedGames = [...games].sort((a, b) => b.date - a.date);
 
-  // Only show for PLAYER role
-  if (convexUser?.role !== "PLAYER") {
+  if (!convexUser) {
+    return null;
+  }
+
+  if (convexUser.role !== "COACH") {
     return (
       <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
         <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-          <Ionicons name="lock-closed" size={64} color={colors.textMuted} />
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold", marginTop: 16 }}>
-            Acesso Restrito
+        <SafeAreaView
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+        >
+          <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 20,
+              fontWeight: "700",
+              marginTop: 16,
+            }}
+          >
+            Acesso restrito
           </Text>
           <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 8 }}>
-            Apenas jogadores podem aceder à gestão de jogos
+            Esta página está disponível apenas para treinadores.
           </Text>
         </SafeAreaView>
       </LinearGradient>
     );
   }
 
-  const upcomingGames = games.filter((game: any) => game.status === "upcoming");
-  const completedGames = games.filter((game: any) => game.status === "completed");
+  const resetCreateForm = () => {
+    setCreateForm(emptyCreateForm);
+    setShowCreateModal(false);
+  };
+
+  const resetEditForm = () => {
+    setEditForm(emptyEditForm);
+    setSelectedGame(null);
+    setShowEditModal(false);
+  };
+
+  const openEditModal = (game: GameWithTeams) => {
+    setSelectedGame(game);
+    setEditForm({
+      location: game.location || "",
+      date: new Date(game.date).toISOString().slice(0, 16),
+      notes: game.notes || "",
+      score1: game.score1?.toString() || "",
+      score2: game.score2?.toString() || "",
+      status: game.status,
+    });
+    setShowEditModal(true);
+  };
+
+  const formatGameDate = (timestamp: number) =>
+    new Date(timestamp).toLocaleString("pt-PT", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+  const getOpponentName = (game: GameWithTeams) => {
+    if (!team) return "Equipa";
+    return game.team1Id === team._id ? game.team2?.name : game.team1?.name;
+  };
+
+  const getStatusLabel = (status: GameWithTeams["status"]) => {
+    switch (status) {
+      case "scheduled":
+        return "Agendado";
+      case "in_progress":
+        return "A decorrer";
+      case "completed":
+        return "Concluído";
+      case "cancelled":
+        return "Cancelado";
+    }
+  };
+
+  const getStatusColor = (status: GameWithTeams["status"]) => {
+    switch (status) {
+      case "scheduled":
+        return colors.primary;
+      case "in_progress":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "cancelled":
+        return colors.danger;
+    }
+  };
 
   const handleCreateGame = async () => {
+    if (!team || !convexUser) return;
+    if (!createForm.name.trim() || !createForm.location.trim() || !createForm.date || !createForm.opponentTeamId) {
+      Alert.alert("Erro", "Preenche nome, adversário, local e data.");
+      return;
+    }
+
+    const parsedDate = new Date(createForm.date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      Alert.alert("Erro", "A data do jogo não é válida.");
+      return;
+    }
+
     try {
-      if (!createFormData.opponent || !createFormData.location || !createFormData.date || !createFormData.time) {
-        Alert.alert("Erro", "Preencha todos os campos obrigatórios");
-        return;
-      }
-
-      await createGameMutation({
-        opponent: createFormData.opponent,
-        location: createFormData.location,
-        date: parseInt(createFormData.date) || Date.now(),
-        time: createFormData.time,
-        home_or_away: createFormData.home_or_away,
-      } as any);
-
-      setShowCreateForm(false);
-      setCreateFormData({
-        opponent: "",
-        location: "",
-        date: "",
-        time: "",
-        home_or_away: "home",
+      await createGame({
+        sessionUserId: convexUser._id,
+        name: createForm.name.trim(),
+        team1Id: team._id,
+        team2Id: createForm.opponentTeamId as Id<"teams">,
+        date: parsedDate.getTime(),
+        location: createForm.location.trim(),
+        notes: createForm.notes.trim() || undefined,
       });
-      Alert.alert("Sucesso", "Jogo criado com sucesso!");
+      resetCreateForm();
+      Alert.alert("Sucesso", "Jogo criado com sucesso.");
     } catch (error) {
-      Alert.alert("Erro", "Falha ao criar jogo");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao criar jogo.");
     }
   };
 
   const handleUpdateGame = async () => {
-    if (!selectedGame) return;
-    
+    if (!selectedGame || !convexUser) return;
+
+    const parsedDate = new Date(editForm.date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      Alert.alert("Erro", "A data do jogo não é válida.");
+      return;
+    }
+
     try {
-      const updateData: any = {};
-      if (updateFormData.result_scored) updateData.result_scored = parseInt(updateFormData.result_scored);
-      if (updateFormData.result_conceded) updateData.result_conceded = parseInt(updateFormData.result_conceded);
-      if (updateFormData.minutes_played) updateData.minutes_played = parseInt(updateFormData.minutes_played);
-      if (updateFormData.position) updateData.position = updateFormData.position;
-      if (updateFormData.goals) updateData.goals = parseInt(updateFormData.goals);
-      if (updateFormData.assists) updateData.assists = parseInt(updateFormData.assists);
-      if (updateFormData.analysis) updateData.analysis = updateFormData.analysis;
-      if (updateFormData.notes) updateData.notes = updateFormData.notes;
-
-      await updateGameMutation({
-        gameId: selectedGame._id as any,
-        ...updateData,
-      } as any);
-
-      setShowUpdateForm(false);
-      setSelectedGame(null);
-      setUpdateFormData({
-        result_scored: "",
-        result_conceded: "",
-        minutes_played: "",
-        position: "",
-        goals: "",
-        assists: "",
-        analysis: "",
-        notes: "",
+      await updateGame({
+        sessionUserId: convexUser._id,
+        gameId: selectedGame._id,
+        location: editForm.location.trim() || undefined,
+        date: parsedDate.getTime(),
+        notes: editForm.notes.trim() || undefined,
+        status: editForm.status,
+        score1: editForm.score1 ? Number(editForm.score1) : undefined,
+        score2: editForm.score2 ? Number(editForm.score2) : undefined,
       });
-      Alert.alert("Sucesso", "Jogo atualizado com sucesso!");
+      resetEditForm();
+      Alert.alert("Sucesso", "Jogo atualizado.");
     } catch (error) {
-      Alert.alert("Erro", "Falha ao atualizar jogo");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao atualizar jogo.");
     }
   };
 
-  const handleDeleteGame = async (game: Game) => {
-    Alert.alert(
-      "Confirmar Eliminação",
-      `Tem a certeza que quer eliminar o jogo vs ${game.opponent}?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteGameMutation({ gameId: game._id } as any);
-              Alert.alert("Sucesso", "Jogo eliminado com sucesso!");
-            } catch (error) {
-              Alert.alert("Erro", "Falha ao eliminar jogo");
+  const handleDeleteGame = (game: GameWithTeams) => {
+    if (!convexUser) return;
+    Alert.alert("Eliminar jogo", `Queres remover o jogo "${game.name}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteGame({
+              sessionUserId: convexUser._id,
+              gameId: game._id,
+            });
+            if (selectedGame?._id === game._id) {
+              resetEditForm();
             }
-          },
+            Alert.alert("Sucesso", "Jogo eliminado.");
+          } catch (error) {
+            Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao eliminar jogo.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const renderGameCard = ({ item }: { item: Game }) => (
+  const renderGameCard = ({ item }: { item: GameWithTeams }) => (
     <View
       style={{
         backgroundColor: colors.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
-        marginVertical: 8,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        elevation: 3,
+        marginBottom: 12,
       }}
     >
       <View
@@ -194,501 +270,79 @@ export default function Jogos() {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "flex-start",
+          marginBottom: 10,
         }}
       >
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.text }}>
-            {item.home_or_away === "home" ? "🏠" : "✈️"} vs {item.opponent}
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>
+            {item.name}
           </Text>
-          <Text style={{ color: colors.text, marginTop: 4 }}>
-            📍 {item.location}
+          <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+            {team?.name} vs {getOpponentName(item)}
           </Text>
-          <Text style={{ color: colors.text, marginTop: 2 }}>
-            📅 {item.date} ⏰ {item.time}
+          <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+            {formatGameDate(item.date)}
           </Text>
+          <Text style={{ color: colors.textMuted, marginTop: 2 }}>{item.location}</Text>
         </View>
         <View
           style={{
-            backgroundColor: item.status === "completed" ? colors.success : colors.warning,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderRadius: 12,
+            backgroundColor: getStatusColor(item.status),
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 999,
           }}
         >
-          <Text style={{ color: "white", fontSize: 12 }}>
-            {item.status === "completed" ? "Concluído" : "Por jogar"}
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>
+            {getStatusLabel(item.status)}
           </Text>
         </View>
       </View>
 
       {item.status === "completed" && (
-        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <Text style={{ color: colors.text, fontWeight: "bold" }}>
-            Resultado: {item.result_scored} - {item.result_conceded}
-          </Text>
-          {item.minutes_played && (
-            <Text style={{ color: colors.text }}>Minutos jogados: {item.minutes_played}</Text>
-          )}
-          {item.position && (
-            <Text style={{ color: colors.text }}>Posição: {item.position}</Text>
-          )}
-          {(item.goals !== undefined || item.assists !== undefined) && (
-            <Text style={{ color: colors.text }}>
-              Golos: {item.goals || 0} | Assistências: {item.assists || 0}
-            </Text>
-          )}
-        </View>
+        <Text style={{ color: colors.text, marginBottom: 10, fontWeight: "600" }}>
+          Resultado: {item.score1 ?? 0} - {item.score2 ?? 0}
+        </Text>
       )}
 
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 12,
-        }}
-      >
+      {item.notes ? (
+        <Text style={{ color: colors.textMuted, marginBottom: 12 }}>{item.notes}</Text>
+      ) : null}
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
         <TouchableOpacity
           style={{
-            backgroundColor: item.status === "upcoming" ? colors.primary : colors.success,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8,
+            flex: 1,
+            backgroundColor: colors.primary,
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: "center",
           }}
-          onPress={() => {
-            setSelectedGame(item);
-            setShowUpdateForm(true);
-          }}
+          onPress={() => openEditModal(item)}
         >
-          <Text style={{ color: "white", fontWeight: "bold" }}>
-            {item.status === "upcoming" ? "Registrar Resultado" : "Editar"}
-          </Text>
+          <Text style={{ color: "white", fontWeight: "700" }}>Editar</Text>
         </TouchableOpacity>
-        
         <TouchableOpacity
           style={{
+            flex: 1,
             backgroundColor: colors.danger,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8,
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: "center",
           }}
           onPress={() => handleDeleteGame(item)}
         >
-          <Text style={{ color: "white", fontWeight: "bold" }}>Eliminar</Text>
+          <Text style={{ color: "white", fontWeight: "700" }}>Eliminar</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  if (showCreateForm) {
-    return (
-      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-        <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, padding: 20 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: colors.text,
-              marginBottom: 20,
-            }}
-          >
-            Novo Jogo
-          </Text>
-
-          <TextInput
-            placeholder="Adversário"
-            value={createFormData.opponent}
-            onChangeText={(text) =>
-              setCreateFormData({ ...createFormData, opponent: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-          />
-
-          <TextInput
-            placeholder="Localização"
-            value={createFormData.location}
-            onChangeText={(text) =>
-              setCreateFormData({ ...createFormData, location: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-          />
-
-          <TextInput
-            placeholder="Data (AAAA-MM-DD)"
-            value={createFormData.date}
-            onChangeText={(text) =>
-              setCreateFormData({ ...createFormData, date: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-          />
-
-          <TextInput
-            placeholder="Hora (HH:MM)"
-            value={createFormData.time}
-            onChangeText={(text) =>
-              setCreateFormData({ ...createFormData, time: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-          />
-
-          <Text style={{ color: colors.text, marginBottom: 8 }}>Tipo de jogo</Text>
-          <View style={{ flexDirection: "row", marginBottom: 20 }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor:
-                  createFormData.home_or_away === "home"
-                    ? colors.primary
-                    : colors.surface,
-                padding: 12,
-                borderRadius: 8,
-                marginRight: 8,
-                flex: 1,
-              }}
-              onPress={() => setCreateFormData({ ...createFormData, home_or_away: "home" })}
-            >
-              <Text
-                style={{
-                  color: createFormData.home_or_away === "home" ? "white" : colors.text,
-                  textAlign: "center",
-                }}
-              >
-                🏠 Casa
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor:
-                  createFormData.home_or_away === "away"
-                    ? colors.primary
-                    : colors.surface,
-                padding: 12,
-                borderRadius: 8,
-                flex: 1,
-              }}
-              onPress={() => setCreateFormData({ ...createFormData, home_or_away: "away" })}
-            >
-              <Text
-                style={{
-                  color: createFormData.home_or_away === "away" ? "white" : colors.text,
-                  textAlign: "center",
-                }}
-              >
-                ✈️ Fora
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.danger,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginRight: 8,
-                alignItems: "center",
-              }}
-              onPress={() => setShowCreateForm(false)}
-            >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                Cancelar
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primary,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginLeft: 8,
-                alignItems: "center",
-              }}
-              onPress={handleCreateGame}
-            >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                Criar
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
-
-  if (showUpdateForm && selectedGame) {
-    return (
-      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-        <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, padding: 20 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: colors.text,
-              marginBottom: 20,
-            }}
-          >
-            {selectedGame.status === "upcoming" ? "Registrar Resultado" : "Editar Jogo"}
-          </Text>
-
-          <Text style={{ fontSize: 18, color: colors.text, marginBottom: 4 }}>
-            vs {selectedGame.opponent}
-          </Text>
-          <Text style={{ color: colors.textMuted, marginBottom: 20 }}>
-            {selectedGame.date} • {selectedGame.time} • {selectedGame.location}
-          </Text>
-
-          {selectedGame.status === "upcoming" ? (
-            <>
-              <Text style={{ color: colors.text, marginBottom: 8 }}>Resultado</Text>
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                <TextInput
-                  placeholder="Golos Marcados"
-                  value={updateFormData.result_scored}
-                  onChangeText={(text) =>
-                    setUpdateFormData({ ...updateFormData, result_scored: text })
-                  }
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
-                    color: colors.text,
-                    flex: 1,
-                    marginRight: 8,
-                    textAlign: "center",
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={{ alignSelf: "center", fontSize: 24, color: colors.text }}>-</Text>
-                <TextInput
-                  placeholder="Golos Sofridos"
-                  value={updateFormData.result_conceded}
-                  onChangeText={(text) =>
-                    setUpdateFormData({ ...updateFormData, result_conceded: text })
-                  }
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
-                    color: colors.text,
-                    flex: 1,
-                    marginLeft: 8,
-                    textAlign: "center",
-                  }}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <TextInput
-                placeholder="Minutos jogados"
-                value={updateFormData.minutes_played}
-                onChangeText={(text) =>
-                  setUpdateFormData({ ...updateFormData, minutes_played: text })
-                }
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                keyboardType="numeric"
-              />
-
-              <TextInput
-                placeholder="Posição em que jogou"
-                value={updateFormData.position}
-                onChangeText={(text) =>
-                  setUpdateFormData({ ...updateFormData, position: text })
-                }
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-              />
-
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                <TextInput
-                  placeholder="Golos"
-                  value={updateFormData.goals}
-                  onChangeText={(text) =>
-                    setUpdateFormData({ ...updateFormData, goals: text })
-                  }
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
-                    color: colors.text,
-                    flex: 1,
-                    marginRight: 8,
-                  }}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  placeholder="Assistências"
-                  value={updateFormData.assists}
-                  onChangeText={(text) =>
-                    setUpdateFormData({ ...updateFormData, assists: text })
-                  }
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
-                    color: colors.text,
-                    flex: 1,
-                    marginLeft: 8,
-                  }}
-                  keyboardType="numeric"
-                />
-              </View>
-            </>
-          ) : (
-            <>
-              <TextInput
-                placeholder="Minutos jogados"
-                value={selectedGame.minutes_played?.toString() || ""}
-                editable={false}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-              />
-              <TextInput
-                placeholder="Posição"
-                value={selectedGame.position || ""}
-                editable={false}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-              />
-            </>
-          )}
-
-          <TextInput
-            placeholder="Análise do desempenho"
-            value={updateFormData.analysis}
-            onChangeText={(text) =>
-              setUpdateFormData({ ...updateFormData, analysis: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-              height: 80,
-            }}
-            multiline
-          />
-
-          <TextInput
-            placeholder="Notas adicionais"
-            value={updateFormData.notes}
-            onChangeText={(text) =>
-              setUpdateFormData({ ...updateFormData, notes: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 20,
-              height: 80,
-            }}
-            multiline
-          />
-
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.danger,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginRight: 8,
-                alignItems: "center",
-              }}
-              onPress={() => {
-                setShowUpdateForm(false);
-                setSelectedGame(null);
-                setUpdateFormData({
-                  result_scored: "",
-                  result_conceded: "",
-                  minutes_played: "",
-                  position: "",
-                  goals: "",
-                  assists: "",
-                  analysis: "",
-                  notes: "",
-                });
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                Cancelar
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primary,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginLeft: 8,
-                alignItems: "center",
-              }}
-              onPress={handleUpdateGame}
-            >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                {selectedGame.status === "upcoming" ? "Registrar" : "Salvar"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
-
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={{ padding: 20, paddingBottom: 10 }}>
+        <View style={{ padding: 20, paddingBottom: 12 }}>
           <View
             style={{
               flexDirection: "row",
@@ -696,54 +350,282 @@ export default function Jogos() {
               alignItems: "center",
             }}
           >
-            <Text
-              style={{ fontSize: 24, fontWeight: "bold", color: colors.text }}
-            >
-              Jogos
-            </Text>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+                Jogos
+              </Text>
+              <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+                {team ? `Gestão de jogos da equipa ${team.name}` : "Cria a tua equipa para começar."}
+              </Text>
+            </View>
             <TouchableOpacity
+              disabled={!team}
               style={{
-                backgroundColor: colors.primary,
+                backgroundColor: team ? colors.primary : colors.surface,
                 paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: 8,
+                paddingVertical: 10,
+                borderRadius: 10,
               }}
-              onPress={() => setShowCreateForm(true)}
+              onPress={() => setShowCreateModal(true)}
             >
-              <Text style={{ color: "white", fontWeight: "bold" }}>+ Novo Jogo</Text>
+              <Text style={{ color: team ? "white" : colors.textMuted, fontWeight: "700" }}>
+                + Jogo
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Games List */}
-        <FlatList
-          data={[...upcomingGames, ...completedGames] as any}
+        <FlatList<GameWithTeams>
+          data={sortedGames}
           keyExtractor={(item) => item._id}
           renderItem={renderGameCard}
-          contentContainerStyle={{ padding: 20, paddingTop: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
           ListEmptyComponent={
-            <View style={{ alignItems: "center", paddingVertical: 40 }}>
-              <Text style={{ color: colors.textMuted, fontSize: 16 }}>
-                Nenhum jogo encontrado
-              </Text>
-              <TouchableOpacity
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 16,
+                padding: 24,
+                alignItems: "center",
+                marginTop: 20,
+              }}
+            >
+              <Ionicons name="football-outline" size={42} color={colors.textMuted} />
+              <Text
                 style={{
-                  backgroundColor: colors.primary,
-                  paddingHorizontal: 20,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  marginTop: 16,
+                  color: colors.text,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  marginTop: 12,
                 }}
-                onPress={() => setShowCreateForm(true)}
               >
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  Criar Primeiro Jogo
-                </Text>
-              </TouchableOpacity>
+                Nenhum jogo registado
+              </Text>
+              <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 6 }}>
+                {team
+                  ? "Cria o primeiro jogo da equipa para o veres aqui."
+                  : "Cria ou associa uma equipa primeiro."}
+              </Text>
             </View>
           }
         />
+
+        <Modal visible={showCreateModal} animationType="slide" onRequestClose={resetCreateForm}>
+          <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, padding: 20 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 20,
+                }}
+              >
+                <TouchableOpacity onPress={resetCreateForm}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700" }}>
+                  Novo jogo
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              <TextInput
+                value={createForm.name}
+                onChangeText={(text) => setCreateForm((current) => ({ ...current, name: text }))}
+                placeholder="Nome do jogo"
+                placeholderTextColor={colors.textMuted}
+                style={inputStyle(colors)}
+              />
+              <TextInput
+                value={createForm.location}
+                onChangeText={(text) => setCreateForm((current) => ({ ...current, location: text }))}
+                placeholder="Local"
+                placeholderTextColor={colors.textMuted}
+                style={inputStyle(colors)}
+              />
+              <TextInput
+                value={createForm.date}
+                onChangeText={(text) => setCreateForm((current) => ({ ...current, date: text }))}
+                placeholder="Data e hora (ex: 2026-04-22T19:30)"
+                placeholderTextColor={colors.textMuted}
+                style={inputStyle(colors)}
+              />
+              <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
+                Adversário
+              </Text>
+              <View style={{ gap: 8, marginBottom: 16 }}>
+                {opponentTeams.map((opponent: Team) => (
+                  <TouchableOpacity
+                    key={opponent._id}
+                    style={{
+                      backgroundColor:
+                        createForm.opponentTeamId === opponent._id ? colors.primary : colors.surface,
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                    onPress={() =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        opponentTeamId: opponent._id,
+                      }))
+                    }
+                  >
+                    <Text
+                      style={{
+                        color:
+                          createForm.opponentTeamId === opponent._id ? "white" : colors.text,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {opponent.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                value={createForm.notes}
+                onChangeText={(text) => setCreateForm((current) => ({ ...current, notes: text }))}
+                placeholder="Notas opcionais"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={[inputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+              />
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+                onPress={handleCreateGame}
+              >
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                  Guardar jogo
+                </Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          </LinearGradient>
+        </Modal>
+
+        <Modal visible={showEditModal} animationType="slide" onRequestClose={resetEditForm}>
+          <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, padding: 20 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 20,
+                }}
+              >
+                <TouchableOpacity onPress={resetEditForm}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700" }}>
+                  Editar jogo
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              <TextInput
+                value={editForm.location}
+                onChangeText={(text) => setEditForm((current) => ({ ...current, location: text }))}
+                placeholder="Local"
+                placeholderTextColor={colors.textMuted}
+                style={inputStyle(colors)}
+              />
+              <TextInput
+                value={editForm.date}
+                onChangeText={(text) => setEditForm((current) => ({ ...current, date: text }))}
+                placeholder="Data e hora (ex: 2026-04-22T19:30)"
+                placeholderTextColor={colors.textMuted}
+                style={inputStyle(colors)}
+              />
+
+              <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
+                Estado
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                {(["scheduled", "in_progress", "completed", "cancelled"] as const).map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={{
+                      backgroundColor: editForm.status === status ? colors.primary : colors.surface,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 999,
+                    }}
+                    onPress={() => setEditForm((current) => ({ ...current, status }))}
+                  >
+                    <Text
+                      style={{
+                        color: editForm.status === status ? "white" : colors.text,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {getStatusLabel(status)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TextInput
+                  value={editForm.score1}
+                  onChangeText={(text) => setEditForm((current) => ({ ...current, score1: text }))}
+                  placeholder={team?.name || "Equipa 1"}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                  style={[inputStyle(colors), { flex: 1 }]}
+                />
+                <TextInput
+                  value={editForm.score2}
+                  onChangeText={(text) => setEditForm((current) => ({ ...current, score2: text }))}
+                  placeholder="Adversário"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                  style={[inputStyle(colors), { flex: 1 }]}
+                />
+              </View>
+
+              <TextInput
+                value={editForm.notes}
+                onChangeText={(text) => setEditForm((current) => ({ ...current, notes: text }))}
+                placeholder="Notas"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={[inputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+              />
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+                onPress={handleUpdateGame}
+              >
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                  Guardar alterações
+                </Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          </LinearGradient>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
+}
+
+function inputStyle(colors: ReturnType<typeof useTheme>["colors"]) {
+  return {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    color: colors.text,
+    marginBottom: 16,
+  } as const;
 }

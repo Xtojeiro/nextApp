@@ -32,18 +32,26 @@ export default function ChatTab() {
   const [newChatModalVisible, setNewChatModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const conversations = useQuery(api.chat.getConversations, user ? {} : "skip");
+  const conversations = useQuery(
+    api.chat.getConversations,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
   const messages = useQuery(
     api.chat.getMessages,
-    selectedConversation
-      ? { conversationId: selectedConversation.id as any }
+    user && selectedConversation
+      ? {
+          sessionUserId: user.id as any,
+          conversationId: selectedConversation.id as any,
+        }
       : "skip",
   );
 
   // Search for users to message
   const searchResults = useQuery(
     api.chat.searchUsersToMessage,
-    searchQuery.length >= 2 ? { searchQuery } : "skip",
+    user && searchQuery.length >= 2
+      ? { sessionUserId: user.id as any, searchQuery }
+      : "skip",
   );
 
   const sendMessage = useMutation(api.chat.sendMessage);
@@ -51,13 +59,17 @@ export default function ChatTab() {
   const markAsRead = useMutation(api.chat.markMessagesAsRead);
   const blockUser = useMutation(api.chat.blockUser);
   const unblockUser = useMutation(api.chat.unblockUser);
-  const blockedUsers = useQuery(api.chat.getBlockedUsers, user ? {} : "skip");
+  const blockedUsers = useQuery(
+    api.chat.getBlockedUsers,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedConversation || !user) return;
 
     try {
       await sendMessage({
+        sessionUserId: user.id as any,
         conversationId: selectedConversation.id as any,
         content: messageText.trim(),
       } as any);
@@ -76,6 +88,7 @@ export default function ChatTab() {
     setView("chat");
     if (user) {
       markAsRead({
+        sessionUserId: user.id as any,
         conversationId: conversation.id as any,
       } as any);
     }
@@ -93,6 +106,7 @@ export default function ChatTab() {
   const handleStartConversation = async (recipientId: string) => {
     try {
       const result = await createConversation({
+        sessionUserId: user!.id as any,
         recipientId: recipientId as any,
       });
       setNewChatModalVisible(false);
@@ -174,10 +188,12 @@ export default function ChatTab() {
               try {
                 if (isBlocked) {
                   await unblockUser({
+                    sessionUserId: user.id as any,
                     userId: selectedConversation.otherUserId as any,
                   } as any);
                 } else {
                   await blockUser({
+                    sessionUserId: user.id as any,
                     userId: selectedConversation.otherUserId as any,
                   } as any);
                 }

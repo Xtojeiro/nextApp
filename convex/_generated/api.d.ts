@@ -10,6 +10,7 @@
 
 import type * as achievements from "../achievements.js";
 import type * as attendance from "../attendance.js";
+import type * as authHelpers from "../authHelpers.js";
 import type * as chat from "../chat.js";
 import type * as events from "../events.js";
 import type * as follows from "../follows.js";
@@ -37,6 +38,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   achievements: typeof achievements;
   attendance: typeof attendance;
+  authHelpers: typeof authHelpers;
   chat: typeof chat;
   events: typeof events;
   follows: typeof follows;

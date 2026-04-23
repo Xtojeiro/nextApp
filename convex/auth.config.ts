@@ -1,6 +1,5 @@
 import { AuthConfig } from 'convex/server';
-import { clerkAuth } from 'clerk';
 
 export default {
-  providers: [clerkAuth as any],
+  providers: [],
 } satisfies AuthConfig;

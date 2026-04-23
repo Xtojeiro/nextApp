@@ -57,7 +57,10 @@ export default function Index() {
   const [selectedPost, setSelectedPost] = useState<PostData | null>(null);
   const [newComment, setNewComment] = useState("");
 
-  const posts = useQuery(api.posts.getPostsWithUsers, { limit: 50 });
+  const posts = useQuery(
+    api.posts.getPostsWithUsers,
+    user ? { sessionUserId: user.id as any, limit: 50 } : { limit: 50 },
+  );
   const searchResults = useQuery(
     api.users.searchUsers,
     searchQuery.trim() ? { query: searchQuery } : "skip",
@@ -72,7 +75,7 @@ export default function Index() {
   const isFollowing = useQuery(
     api.follows.isFollowing,
     user && selectedUser
-      ? { userId: selectedUser.id as any }
+      ? { sessionUserId: user.id as any, userId: selectedUser.id as any }
       : "skip",
   );
   const sendMessage = useMutation(api.chat.sendMessage);
@@ -89,7 +92,7 @@ export default function Index() {
       return;
     }
     try {
-      await createPost({ content: postContent.trim() });
+      await createPost({ sessionUserId: user!.id as any, content: postContent.trim() });
       setPostContent("");
       setCreatePostModalVisible(false);
       Alert.alert("Success", "Post created successfully");
@@ -100,7 +103,7 @@ export default function Index() {
 
   const handleLikePost = async (postId: string) => {
     try {
-      await likePost({ postId: postId as any });
+      await likePost({ sessionUserId: user!.id as any, postId: postId as any });
     } catch (error) {
       Alert.alert("Error", "Failed to like post");
     }
@@ -117,7 +120,10 @@ export default function Index() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deletePost({ postId: postId as any });
+              await deletePost({
+                sessionUserId: user!.id as any,
+                postId: postId as any,
+              });
               Alert.alert("Success", "Post deleted");
             } catch (error) {
               Alert.alert("Error", "Failed to delete post");
@@ -131,7 +137,11 @@ export default function Index() {
   const handleAddComment = async () => {
     if (!newComment.trim() || !selectedPost) return;
     try {
-      await addComment({ postId: selectedPost._id as any, content: newComment.trim() });
+      await addComment({
+        sessionUserId: user!.id as any,
+        postId: selectedPost._id as any,
+        content: newComment.trim(),
+      });
       setNewComment("");
       setCommentsModalVisible(false);
       setSelectedPost(null);
@@ -143,9 +153,7 @@ export default function Index() {
   const handleFollow = async (userId: string) => {
     if (!user) return;
     try {
-      await followUser({
-        userId: userId as any,
-      });
+      await followUser({ sessionUserId: user.id as any, userId: userId as any });
       Alert.alert("Success", "Followed user");
     } catch (error) {
       Alert.alert("Error", "Failed to follow user");
@@ -155,9 +163,7 @@ export default function Index() {
   const handleUnfollow = async (userId: string) => {
     if (!user) return;
     try {
-      await unfollowUser({
-        userId: userId as any,
-      });
+      await unfollowUser({ sessionUserId: user.id as any, userId: userId as any });
       Alert.alert("Success", "Unfollowed user");
     } catch (error) {
       Alert.alert("Error", "Failed to unfollow user");
@@ -168,6 +174,7 @@ export default function Index() {
     if (!user) return;
     try {
       await sendMessage({
+        sessionUserId: user.id as any,
         recipientId: receiverId as any,
         content: "Hi!",
       });

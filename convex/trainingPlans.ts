@@ -1,54 +1,40 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 
 export const getTrainingPlans = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     coachId: v.optional(v.id("users")),
     isActive: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
+    const user = await resolveSessionUser(ctx, args.sessionUserId);
+    if (!user) {
+      return [];
     }
 
     let plans = await ctx.db.query("trainingPlans").collect();
-
-    if (args.coachId) {
-      plans = plans.filter((p) => p.coachId === args.coachId);
-    }
+    if (args.coachId) plans = plans.filter((plan) => plan.coachId === args.coachId);
     if (args.isActive !== undefined) {
-      plans = plans.filter((p) => p.isActive === args.isActive);
+      plans = plans.filter((plan) => plan.isActive === args.isActive);
     }
 
     plans.sort((a, b) => b.createdAt - a.createdAt);
-
     return plans.slice(0, args.limit || 50);
   },
 });
 
 export const getMyTrainingPlans = query({
   args: {
+    sessionUserId: v.id("users"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const user = await requireSessionUser(ctx, args.sessionUserId);
 
     let plans: any[] = [];
-
     if (user.role === "COACH") {
       plans = await ctx.db
         .query("trainingPlans")
@@ -59,10 +45,9 @@ export const getMyTrainingPlans = query({
         .query("players")
         .withIndex("by_userId", (q) => q.eq("userId", user._id))
         .first();
-
       if (playerProfile?.teamId) {
         const allPlans = await ctx.db.query("trainingPlans").collect();
-        plans = allPlans.filter((p) => p.isActive);
+        plans = allPlans.filter((plan) => plan.isActive);
       }
     }
 
@@ -72,24 +57,20 @@ export const getMyTrainingPlans = query({
 
 export const createTrainingPlan = mutation({
   args: {
+    sessionUserId: v.id("users"),
     name: v.string(),
     description: v.optional(v.string()),
     duration: v.number(),
-    difficulty: v.union(v.literal("beginner"), v.literal("intermediate"), v.literal("advanced")),
+    difficulty: v.union(
+      v.literal("beginner"),
+      v.literal("intermediate"),
+      v.literal("advanced"),
+    ),
     goals: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!coach || coach.role !== "COACH") {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
       throw new Error("Only coaches can create training plans");
     }
 
@@ -112,41 +93,32 @@ export const createTrainingPlan = mutation({
 
 export const updateTrainingPlan = mutation({
   args: {
+    sessionUserId: v.id("users"),
     id: v.id("trainingPlans"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     duration: v.optional(v.number()),
-    difficulty: v.optional(v.union(v.literal("beginner"), v.literal("intermediate"), v.literal("advanced"))),
+    difficulty: v.optional(
+      v.union(
+        v.literal("beginner"),
+        v.literal("intermediate"),
+        v.literal("advanced"),
+      ),
+    ),
     goals: v.optional(v.array(v.string())),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!coach || coach.role !== "COACH") {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
       throw new Error("Only coaches can update training plans");
     }
 
     const plan = await ctx.db.get(args.id);
-    if (!plan) {
-      throw new Error("Training plan not found");
-    }
+    if (!plan) throw new Error("Training plan not found");
+    if (plan.coachId !== coach._id) throw new Error("Not authorized to update this plan");
 
-    if (plan.coachId !== coach._id) {
-      throw new Error("Not authorized to update this plan");
-    }
-
-    const updateData: any = {
-      updatedAt: Date.now(),
-    };
+    const updateData: Record<string, any> = { updatedAt: Date.now() };
     if (args.name !== undefined) updateData.name = args.name;
     if (args.description !== undefined) updateData.description = args.description;
     if (args.duration !== undefined) updateData.duration = args.duration;
@@ -161,40 +133,24 @@ export const updateTrainingPlan = mutation({
 
 export const addWorkoutToPlan = mutation({
   args: {
+    sessionUserId: v.id("users"),
     planId: v.id("trainingPlans"),
     workoutId: v.id("workouts"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!coach || coach.role !== "COACH") {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
       throw new Error("Only coaches can modify training plans");
     }
 
     const plan = await ctx.db.get(args.planId);
-    if (!plan) {
-      throw new Error("Training plan not found");
-    }
-
-    if (plan.coachId !== coach._id) {
-      throw new Error("Not authorized");
-    }
+    if (!plan) throw new Error("Training plan not found");
+    if (plan.coachId !== coach._id) throw new Error("Not authorized");
 
     const workouts = plan.workouts || [];
     if (!workouts.includes(args.workoutId)) {
       workouts.push(args.workoutId);
-      await ctx.db.patch(args.planId, {
-        workouts,
-        updatedAt: Date.now(),
-      });
+      await ctx.db.patch(args.planId, { workouts, updatedAt: Date.now() });
     }
 
     return { success: true };
@@ -202,27 +158,50 @@ export const addWorkoutToPlan = mutation({
 });
 
 export const getTrainingPlanStats = query({
-  args: { planId: v.id("trainingPlans") },
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+    planId: v.id("trainingPlans"),
+  },
   handler: async (ctx, args) => {
     const plan = await ctx.db.get(args.planId);
     if (!plan) {
       throw new Error("Training plan not found");
     }
 
-    const workouts = await Promise.all(
-      (plan.workouts || []).map(async (id) => await ctx.db.get(id)),
-    );
-
-    const completedWorkouts = await ctx.db.query("workoutLogs").collect();
+    const workouts = await Promise.all(plan.workouts.map((id) => ctx.db.get(id)));
     const playerProfiles = await ctx.db.query("players").collect();
-    const playersCount = playerProfiles.length;
 
     return {
       totalWorkouts: workouts.length,
-      activeWorkouts: workouts.filter((w) => w !== null).length,
-      totalPlayers: playersCount,
+      activeWorkouts: workouts.filter(Boolean).length,
+      totalPlayers: playerProfiles.length,
       difficulty: plan.difficulty,
       duration: plan.duration,
     };
+  },
+});
+
+export const deleteTrainingPlan = mutation({
+  args: {
+    sessionUserId: v.id("users"),
+    id: v.id("trainingPlans"),
+  },
+  handler: async (ctx, args) => {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
+      throw new Error("Only coaches can delete training plans");
+    }
+
+    const plan = await ctx.db.get(args.id);
+    if (!plan) {
+      throw new Error("Training plan not found");
+    }
+
+    if (plan.coachId !== coach._id) {
+      throw new Error("Not authorized to delete this plan");
+    }
+
+    await ctx.db.delete(args.id);
+    return { success: true };
   },
 });

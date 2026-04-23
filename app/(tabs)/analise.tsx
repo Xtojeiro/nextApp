@@ -17,7 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function Analise() {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const convexUser = useQuery(api.users.getCurrentUser);
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
 
   // Dummy data for analysis - in real implementation, this would come from queries
   const performanceData = [

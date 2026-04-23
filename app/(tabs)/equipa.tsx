@@ -1,10 +1,11 @@
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
@@ -18,525 +19,267 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type TeamAthlete = NonNullable<
+  ReturnType<typeof useQuery<typeof api.teams.getTeamAthletes>>
+>[number];
+
 export default function Equipa() {
   const { colors } = useTheme();
-  const { t } = useTranslation();
-  const convexUser = useQuery(api.users.getCurrentUser as any);
-  const teamAthletes = useQuery(api.users.getTeamAthletes as any, convexUser?.role === "COACH" ? {} : "skip") || [];
-  const addNoteMutation = useMutation(api.users.addAthleteNote as any);
+  const { user } = useAuth();
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
+  );
+  const team = useQuery(
+    api.teams.getTeam,
+    convexUser ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const athletesQuery = useQuery(
+    api.teams.getTeamAthletes,
+    convexUser ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const athletes = athletesQuery ?? [];
+  const addAthleteNote = useMutation(api.users.addAthleteNote);
 
-  const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
-  const [showAthleteModal, setShowAthleteModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedAthlete, setSelectedAthlete] = useState<TeamAthlete | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
-  const [filterPosition, setFilterPosition] = useState<string>("");
+  const [note, setNote] = useState("");
 
-  // Only show for COACH role
-  if (convexUser?.role !== "COACH") {
+  const filteredAthletes = athletes.filter((athlete) => {
+    const name = athlete.user?.full_name || "";
+    const position = athlete.position || "";
+    const query = search.trim().toLowerCase();
+    return name.toLowerCase().includes(query) || position.toLowerCase().includes(query);
+  });
+
+  if (!convexUser) {
+    return null;
+  }
+
+  if (convexUser.role !== "COACH") {
     return (
       <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
         <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-          <Ionicons name="lock-closed" size={64} color={colors.textMuted} />
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold", marginTop: 16 }}>
-            Acesso Restrito
+        <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700", marginTop: 16 }}>
+            Acesso restrito
           </Text>
           <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 8 }}>
-            Apenas treinadores podem aceder à gestão de equipa
+            A gestão da equipa está disponível apenas para treinadores.
           </Text>
         </SafeAreaView>
       </LinearGradient>
     );
   }
 
-  // Filter athletes
-  const filteredAthletes = teamAthletes.filter((athlete: any) => {
-    const matchesSearch = athlete.name?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesStatus = filterStatus === "all" || athlete.status === filterStatus;
-    const matchesPosition = !filterPosition || athlete.position === filterPosition;
-    return matchesSearch && matchesStatus && matchesPosition;
-  });
+  const openNoteModal = (athlete: TeamAthlete) => {
+    setSelectedAthlete(athlete);
+    setNote("");
+    setShowNoteModal(true);
+  };
 
-  const positions: string[] = [...new Set(teamAthletes.map((a: any) => a.position).filter(Boolean) as string[])];
-
-  const handleAddNote = async () => {
-    if (!selectedAthlete || !noteText.trim()) return;
+  const handleSaveNote = async () => {
+    if (!convexUser || !selectedAthlete?.user?._id || !note.trim()) {
+      Alert.alert("Erro", "Escreve uma nota antes de guardar.");
+      return;
+    }
 
     try {
-      await addNoteMutation({
-        athleteId: selectedAthlete.id,
-        note: noteText,
+      await addAthleteNote({
+        sessionUserId: convexUser._id,
+        athleteId: selectedAthlete.user._id,
+        note: note.trim(),
       });
-      Alert.alert("Sucesso", "Nota adicionada com sucesso!");
       setShowNoteModal(false);
-      setNoteText("");
+      Alert.alert(
+        "Nota guardada",
+        "A nota foi validada pelo backend. O modelo atual ainda não persiste estas notas na ficha do atleta.",
+      );
     } catch (error) {
-      Alert.alert("Erro", "Falha ao adicionar nota");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao guardar nota.");
     }
   };
 
-  const getStatusColor = (status: string) => {
-    return status === "active" ? colors.success : colors.warning;
-  };
-
-  const getStatusText = (status: string) => {
-    return status === "active" ? "Ativo" : "Inativo";
-  };
-
-  const renderAthleteCard = ({ item }: { item: any }) => (
-    <TouchableOpacity
+  const renderAthleteCard = ({ item }: { item: TeamAthlete }) => (
+    <View
       style={{
         backgroundColor: colors.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
-        marginVertical: 8,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        elevation: 3,
-      }}
-      onPress={() => {
-        setSelectedAthlete(item);
-        setShowAthleteModal(true);
+        marginBottom: 12,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
         <View
           style={{
-            width: 50,
-            height: 50,
-            borderRadius: 25,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
             backgroundColor: colors.primary,
             justifyContent: "center",
             alignItems: "center",
             marginRight: 12,
           }}
         >
-          <Text style={{ color: "white", fontWeight: "bold", fontSize: 18 }}>
-            {item.name.charAt(0)}
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 18 }}>
+            {(item.user?.full_name || "?").charAt(0).toUpperCase()}
           </Text>
         </View>
-        
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontWeight: "bold", fontSize: 16 }}>
-            {item.name}
+          <Text style={{ color: colors.text, fontSize: 17, fontWeight: "700" }}>
+            {item.user?.full_name || "Atleta"}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-            {item.position} • {item.age} anos
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {item.height_cm}cm • {item.weight_kg}kg
-          </Text>
-        </View>
-        
-        <View
-          style={{
-            backgroundColor: getStatusColor(item.status),
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderRadius: 12,
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 12, fontWeight: "bold" }}>
-            {getStatusText(item.status)}
+          <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+            {item.position || "Sem posição definida"}
           </Text>
         </View>
       </View>
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Ionicons name="barbell" size={16} color={colors.primary} />
-          <Text style={{ color: colors.text, marginLeft: 4, fontSize: 14 }}>
-            {item.totalWorkouts} treinos
-          </Text>
-        </View>
-        
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Ionicons name="football" size={16} color={colors.success} />
-          <Text style={{ color: colors.text, marginLeft: 4, fontSize: 14 }}>
-            {item.totalGames} jogos
-          </Text>
-        </View>
-        
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Ionicons name="calendar" size={16} color={colors.warning} />
-          <Text style={{ color: colors.text, marginLeft: 4, fontSize: 14 }}>
-            {item.weeklyFrequency}x/sem
-          </Text>
-        </View>
+      <View style={{ gap: 4, marginBottom: 12 }}>
+        <Text style={{ color: colors.textMuted }}>
+          Email: {item.user?.email || "Sem email"}
+        </Text>
+        <Text style={{ color: colors.textMuted }}>
+          Perfil: {item.user?.bio || "Sem biografia"}
+        </Text>
       </View>
 
-      {item.notes && (
-        <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <Text style={{ color: colors.textMuted, fontSize: 12, fontStyle: "italic" }}>
-            Nota: {item.notes}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={{
+          backgroundColor: colors.primary,
+          paddingVertical: 10,
+          borderRadius: 10,
+          alignItems: "center",
+        }}
+        onPress={() => openNoteModal(item)}
+      >
+        <Text style={{ color: "white", fontWeight: "700" }}>Adicionar nota</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView style={{ flex: 1, padding: 20 }}>
-          {/* Header */}
-          <View style={{ marginBottom: 24 }}>
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "bold",
-                color: colors.text,
-                marginBottom: 4,
-              }}
-            >
-              Gestão de Atletas
-            </Text>
-            <Text style={{ color: colors.textMuted }}>
-              {teamAthletes.filter((a: any) => a.status === "active").length} atletas ativos •{" "}
-              {teamAthletes.filter((a: any) => a.status === "inactive").length} inativos
-            </Text>
-          </View>
+        <View style={{ padding: 20, paddingBottom: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+            Equipa
+          </Text>
+          <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+            {team ? `${team.name} • ${athletes.length} atletas` : "Sem equipa associada."}
+          </Text>
 
-          {/* Search and Filters */}
-          <View style={{ marginBottom: 16 }}>
-            <TextInput
-              placeholder="Pesquisar atleta..."
-              value={searchText}
-              onChangeText={setSearchText}
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Pesquisar por nome ou posição"
+            placeholderTextColor={colors.textMuted}
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 14,
+              color: colors.text,
+              marginTop: 16,
+            }}
+          />
+        </View>
+
+        <FlatList
+          data={filteredAthletes}
+          keyExtractor={(item) => item._id}
+          renderItem={renderAthleteCard}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+          ListEmptyComponent={
+            <View
               style={{
                 backgroundColor: colors.surface,
-                borderRadius: 8,
-                padding: 12,
-                color: colors.text,
-                marginBottom: 12,
+                borderRadius: 16,
+                padding: 24,
+                alignItems: "center",
+                marginTop: 20,
               }}
-            />
-
-            {/* Status Filter */}
-            <View style={{ flexDirection: "row", marginBottom: 12 }}>
-              {["all", "active", "inactive"].map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={{
-                    backgroundColor:
-                      filterStatus === status ? colors.primary : colors.surface,
-                    padding: 8,
-                    borderRadius: 8,
-                    marginRight: 8,
-                    flex: 1,
-                  }}
-                  onPress={() => setFilterStatus(status as any)}
-                >
-                  <Text
-                    style={{
-                      color: filterStatus === status ? "white" : colors.text,
-                      textAlign: "center",
-                      fontSize: 12,
-                    }}
-                  >
-                    {status === "all" ? "Todos" : status === "active" ? "Ativos" : "Inativos"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            >
+              <Ionicons name="people-outline" size={42} color={colors.textMuted} />
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginTop: 12 }}>
+                Nenhum atleta encontrado
+              </Text>
+              <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 6 }}>
+                {team
+                  ? "Esta equipa ainda não tem atletas associados."
+                  : "Cria uma equipa ou associa atletas para os veres aqui."}
+              </Text>
             </View>
+          }
+        />
 
-            {/* Position Filter */}
-            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: !filterPosition ? colors.primary : colors.surface,
-                  padding: 8,
-                  borderRadius: 8,
-                  marginRight: 8,
-                  marginBottom: 4,
-                }}
-                onPress={() => setFilterPosition("")}
-              >
-                <Text
-                  style={{
-                    color: !filterPosition ? "white" : colors.text,
-                    fontSize: 12,
-                  }}
-                >
-                  Todas
-                </Text>
-              </TouchableOpacity>
-              {positions.map((position: string) => (
-                <TouchableOpacity
-                  key={position}
-                  style={{
-                    backgroundColor: filterPosition === position ? colors.primary : colors.surface,
-                    padding: 8,
-                    borderRadius: 8,
-                    marginRight: 8,
-                    marginBottom: 4,
-                  }}
-                  onPress={() => setFilterPosition(position)}
-                >
-                  <Text
-                    style={{
-                      color: filterPosition === position ? "white" : colors.text,
-                      fontSize: 12,
-                    }}
-                  >
-                    {position}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Athletes List */}
-          <FlatList
-            data={filteredAthletes as any[]}
-            keyExtractor={(item: any) => (item as any).id}
-            renderItem={renderAthleteCard}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          />
-        </ScrollView>
-      </SafeAreaView>
-
-      {/* Athlete Detail Modal */}
-      <Modal
-        visible={showAthleteModal}
-        animationType="slide"
-        onRequestClose={() => setShowAthleteModal(false)}
-      >
-        {selectedAthlete && (
+        <Modal
+          visible={showNoteModal}
+          animationType="slide"
+          onRequestClose={() => setShowNoteModal(false)}
+        >
           <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, padding: 20 }}>
               <View
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: 20,
+                  marginBottom: 20,
                 }}
               >
-                <TouchableOpacity onPress={() => setShowAthleteModal(false)}>
+                <TouchableOpacity onPress={() => setShowNoteModal(false)}>
                   <Ionicons name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold" }}>
-                  {selectedAthlete.name}
+                <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700" }}>
+                  Nota do treinador
                 </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowNoteModal(true);
-                    setShowAthleteModal(false);
-                  }}
-                >
-                  <Ionicons name="create" size={24} color={colors.primary} />
-                </TouchableOpacity>
+                <View style={{ width: 24 }} />
               </View>
 
-              <ScrollView style={{ flex: 1, padding: 20 }}>
-                {/* Profile Info */}
-                <View style={{ alignItems: "center", marginBottom: 24 }}>
-                  <View
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: 40,
-                      backgroundColor: colors.primary,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold", fontSize: 24 }}>
-                      {selectedAthlete.name.charAt(0)}
-                    </Text>
-                  </View>
-                  <Text style={{ color: colors.text, fontSize: 20, fontWeight: "bold" }}>
-                    {selectedAthlete.name}
-                  </Text>
-                  <Text style={{ color: colors.textMuted }}>
-                    {selectedAthlete.position} • {selectedAthlete.age} anos
-                  </Text>
-                </View>
-
-                {/* Stats Grid */}
-                <View style={{ flexDirection: "row", marginBottom: 24 }}>
-                  <View style={{ flex: 1, alignItems: "center", marginRight: 8 }}>
-                    <Text style={{ color: colors.primary, fontSize: 24, fontWeight: "bold" }}>
-                      {selectedAthlete.totalWorkouts}
-                    </Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Treinos</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: "center", marginRight: 8 }}>
-                    <Text style={{ color: colors.success, fontSize: 24, fontWeight: "bold" }}>
-                      {selectedAthlete.totalGames}
-                    </Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Jogos</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: "center", marginRight: 8 }}>
-                    <Text style={{ color: colors.warning, fontSize: 24, fontWeight: "bold" }}>
-                      {selectedAthlete.weeklyFrequency}
-                    </Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>x/sem</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: "center" }}>
-                    <Text style={{ color: colors.text, fontSize: 24, fontWeight: "bold" }}>
-                      {getStatusText(selectedAthlete.status)}
-                    </Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Estado</Text>
-                  </View>
-                </View>
-
-                {/* Physical Info */}
-                <View
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text style={{ color: colors.text, fontWeight: "bold", marginBottom: 8 }}>
-                    Informações Físicas
-                  </Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <View>
-                      <Text style={{ color: colors.textMuted }}>Altura</Text>
-                      <Text style={{ color: colors.text }}>{selectedAthlete.height_cm} cm</Text>
-                    </View>
-                    <View>
-                      <Text style={{ color: colors.textMuted }}>Peso</Text>
-                      <Text style={{ color: colors.text }}>{selectedAthlete.weight_kg} kg</Text>
-                    </View>
-                    <View>
-                      <Text style={{ color: colors.textMuted }}>Pé Preferido</Text>
-                      <Text style={{ color: colors.text }}>
-                        {selectedAthlete.preferred_foot === "RIGHT" ? "Direito" : "Esquerdo"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Notes */}
-                {selectedAthlete.notes && (
-                  <View
-                    style={{
-                      backgroundColor: colors.surface,
-                      borderRadius: 12,
-                      padding: 16,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <Text style={{ color: colors.text, fontWeight: "bold", marginBottom: 8 }}>
-                      Notas do Treinador
-                    </Text>
-                    <Text style={{ color: colors.text }}>{selectedAthlete.notes}</Text>
-                  </View>
-                )}
-
-                {/* Activity */}
-                <View
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text style={{ color: colors.text, fontWeight: "bold", marginBottom: 8 }}>
-                    Atividade Recente
-                  </Text>
-                  <Text style={{ color: colors.text }}>
-                    Última atividade: {selectedAthlete.lastActivity}
-                  </Text>
-                </View>
-              </ScrollView>
-            </SafeAreaView>
-          </LinearGradient>
-        )}
-      </Modal>
-
-      {/* Add Note Modal */}
-      <Modal
-        visible={showNoteModal}
-        animationType="slide"
-        onRequestClose={() => setShowNoteModal(false)}
-      >
-        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-          <SafeAreaView style={{ flex: 1, padding: 20 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <TouchableOpacity onPress={() => setShowNoteModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold" }}>
-                Adicionar Nota
-              </Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            {selectedAthlete && (
-              <View>
-                <Text style={{ color: colors.text, fontSize: 16, marginBottom: 8 }}>
-                  Atleta: {selectedAthlete.name}
+              <ScrollView>
+                <Text style={{ color: colors.text, fontWeight: "700", marginBottom: 8 }}>
+                  {selectedAthlete?.user?.full_name || "Atleta"}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 16 }}>
+                  {selectedAthlete?.position || "Sem posição definida"}
                 </Text>
                 <TextInput
-                  placeholder="Escreva sua nota aqui..."
-                  value={noteText}
-                  onChangeText={setNoteText}
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="Escreve uma observação sobre este atleta"
+                  placeholderTextColor={colors.textMuted}
+                  multiline
                   style={{
                     backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
+                    borderRadius: 12,
+                    padding: 14,
                     color: colors.text,
-                    height: 120,
+                    height: 140,
                     textAlignVertical: "top",
                     marginBottom: 20,
                   }}
-                  multiline
                 />
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: colors.danger,
-                      padding: 16,
-                      borderRadius: 12,
-                      flex: 1,
-                      marginRight: 8,
-                      alignItems: "center",
-                    }}
-                    onPress={() => setShowNoteModal(false)}
-                  >
-                    <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                      Cancelar
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: colors.primary,
-                      padding: 16,
-                      borderRadius: 12,
-                      flex: 1,
-                      marginLeft: 8,
-                      alignItems: "center",
-                    }}
-                    onPress={handleAddNote}
-                  >
-                    <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-                      Adicionar
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: "center",
+                  }}
+                  onPress={handleSaveNote}
+                >
+                  <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                    Guardar nota
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </SafeAreaView>
+          </LinearGradient>
+        </Modal>
+      </SafeAreaView>
     </LinearGradient>
   );
 }

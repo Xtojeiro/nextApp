@@ -1,33 +1,24 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 
-// Get conversations for current user
 export const getConversations = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
+    const user = await resolveSessionUser(ctx, args.sessionUserId);
     if (!user) {
       return [];
     }
 
-    // Get conversations where user is a participant
     const allConversations = await ctx.db.query("conversations").collect();
-
     const conversations = allConversations
       .filter(
-        (conv) =>
-          conv.user_one_id === user._id || conv.user_two_id === user._id,
+        (conversation) =>
+          conversation.user_one_id === user._id ||
+          conversation.user_two_id === user._id,
       )
       .sort(
         (a, b) =>
@@ -35,34 +26,26 @@ export const getConversations = query({
       )
       .slice(0, args.limit || 50);
 
-    // Get participant details for each conversation
-    const conversationsWithDetails = await Promise.all(
+    return await Promise.all(
       conversations.map(async (conversation) => {
         const otherParticipantId =
           conversation.user_one_id === user._id
             ? conversation.user_two_id
             : conversation.user_one_id;
         const otherParticipant = await ctx.db.get(otherParticipantId);
-
-        const messages = await ctx.db
+        const latestMessages = await ctx.db
           .query("messages")
           .withIndex("by_conversation_id", (q) =>
             q.eq("conversation_id", conversation._id),
           )
           .order("desc")
           .take(1);
-
-        // Count unread messages
         const allMessages = await ctx.db
           .query("messages")
           .withIndex("by_conversation_id", (q) =>
             q.eq("conversation_id", conversation._id),
           )
           .collect();
-
-        const unreadCount = allMessages.filter(
-          (m) => !m.is_read && m.sender_id !== user._id,
-        ).length;
 
         return {
           id: conversation._id,
@@ -75,45 +58,31 @@ export const getConversations = query({
                 avatar_url: otherParticipant.avatar,
               }
             : null,
-          lastMessage: messages[0]
+          lastMessage: latestMessages[0]
             ? {
-                ...messages[0],
-                id: messages[0]._id,
-                created_at: messages[0].created_at,
+                ...latestMessages[0],
+                id: latestMessages[0]._id,
               }
             : null,
-          unreadCount,
+          unreadCount: allMessages.filter(
+            (message) => !message.is_read && message.sender_id !== user._id,
+          ).length,
           created_at: conversation.created_at,
           updated_at: conversation.updated_at,
         };
       }),
     );
-
-    return conversationsWithDetails;
   },
 });
 
-// Get messages for a conversation
 export const getMessages = query({
   args: {
+    sessionUserId: v.id("users"),
     conversationId: v.id("conversations"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
+    const user = await requireSessionUser(ctx, args.sessionUserId);
     const conversation = await ctx.db.get(args.conversationId);
     if (
       !conversation ||
@@ -131,7 +100,6 @@ export const getMessages = query({
       .order("desc")
       .take(args.limit || 50);
 
-    // Get sender details for each message
     const messagesWithSenders = await Promise.all(
       messages.map(async (message) => {
         const sender = await ctx.db.get(message.sender_id);
@@ -155,67 +123,47 @@ export const getMessages = query({
       }),
     );
 
-    return messagesWithSenders.reverse(); // Return in chronological order
+    return messagesWithSenders.reverse();
   },
 });
 
-// Send message
 export const sendMessage = mutation({
   args: {
+    sessionUserId: v.id("users"),
     conversationId: v.optional(v.id("conversations")),
     recipientId: v.optional(v.id("users")),
     content: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const sender = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!sender) {
-      throw new Error("User not found");
-    }
-
+    const sender = await requireSessionUser(ctx, args.sessionUserId);
     let conversationId = args.conversationId;
 
-    // If no conversationId provided, create new conversation
     if (!conversationId) {
       if (!args.recipientId) {
         throw new Error("Recipient ID required for new conversation");
       }
 
-      // Check if conversation already exists
       const allConversations = await ctx.db.query("conversations").collect();
-
       const existingConversation = allConversations.find(
-        (conv) =>
-          (conv.user_one_id === sender._id &&
-            conv.user_two_id === args.recipientId!) ||
-          (conv.user_one_id === args.recipientId! &&
-            conv.user_two_id === sender._id),
+        (conversation) =>
+          (conversation.user_one_id === sender._id &&
+            conversation.user_two_id === args.recipientId) ||
+          (conversation.user_one_id === args.recipientId &&
+            conversation.user_two_id === sender._id),
       );
 
-      if (existingConversation) {
-        conversationId = existingConversation._id;
-      } else {
-        // Create new conversation
-        conversationId = await ctx.db.insert("conversations", {
+      conversationId =
+        existingConversation?._id ||
+        (await ctx.db.insert("conversations", {
           user_one_id: sender._id,
-          user_two_id: args.recipientId!,
+          user_two_id: args.recipientId,
           last_message: args.content,
           last_message_at: Date.now(),
           created_at: Date.now(),
           updated_at: Date.now(),
-        });
-      }
+        }));
     }
 
-    // Verify user is part of the conversation
     const conversation = await ctx.db.get(conversationId);
     if (
       !conversation ||
@@ -234,7 +182,6 @@ export const sendMessage = mutation({
       is_read: true,
     });
 
-    // Update conversation with last message
     await ctx.db.patch(conversationId, {
       last_message: args.content,
       last_message_at: timestamp,
@@ -245,46 +192,30 @@ export const sendMessage = mutation({
   },
 });
 
-// Create new conversation (for starting new chats)
 export const createConversation = mutation({
   args: {
+    sessionUserId: v.id("users"),
     recipientId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const sender = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!sender) {
-      throw new Error("User not found");
-    }
-
+    const sender = await requireSessionUser(ctx, args.sessionUserId);
     if (sender._id === args.recipientId) {
       throw new Error("Cannot start conversation with yourself");
     }
 
-    // Check if conversation already exists
     const allConversations = await ctx.db.query("conversations").collect();
-
     const existingConversation = allConversations.find(
-      (conv) =>
-        (conv.user_one_id === sender._id &&
-          conv.user_two_id === args.recipientId) ||
-        (conv.user_one_id === args.recipientId &&
-          conv.user_two_id === sender._id),
+      (conversation) =>
+        (conversation.user_one_id === sender._id &&
+          conversation.user_two_id === args.recipientId) ||
+        (conversation.user_one_id === args.recipientId &&
+          conversation.user_two_id === sender._id),
     );
 
     if (existingConversation) {
       return { success: true, conversationId: existingConversation._id };
     }
 
-    // Create new conversation
     const conversationId = await ctx.db.insert("conversations", {
       user_one_id: sender._id,
       user_two_id: args.recipientId,
@@ -296,26 +227,13 @@ export const createConversation = mutation({
   },
 });
 
-// Mark messages as read
 export const markMessagesAsRead = mutation({
   args: {
+    sessionUserId: v.id("users"),
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
+    const user = await requireSessionUser(ctx, args.sessionUserId);
     const conversation = await ctx.db.get(args.conversationId);
     if (
       !conversation ||
@@ -325,7 +243,6 @@ export const markMessagesAsRead = mutation({
       throw new Error("Not authorized");
     }
 
-    // Get unread messages
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation_id", (q) =>
@@ -336,9 +253,7 @@ export const markMessagesAsRead = mutation({
     let updatedCount = 0;
     for (const message of messages) {
       if (!message.is_read) {
-        await ctx.db.patch(message._id, {
-          is_read: true,
-        });
+        await ctx.db.patch(message._id, { is_read: true });
         updatedCount++;
       }
     }
@@ -347,31 +262,17 @@ export const markMessagesAsRead = mutation({
   },
 });
 
-// Block user
 export const blockUser = mutation({
   args: {
+    sessionUserId: v.id("users"),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const blocker = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!blocker) {
-      throw new Error("User not found");
-    }
-
+    const blocker = await requireSessionUser(ctx, args.sessionUserId);
     if (blocker._id === args.userId) {
       throw new Error("Cannot block yourself");
     }
 
-    // Check if already blocked
     const existingBlock = await ctx.db
       .query("blockedUsers")
       .filter((q) =>
@@ -396,26 +297,13 @@ export const blockUser = mutation({
   },
 });
 
-// Unblock user
 export const unblockUser = mutation({
   args: {
+    sessionUserId: v.id("users"),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const blocker = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!blocker) {
-      throw new Error("User not found");
-    }
-
+    const blocker = await requireSessionUser(ctx, args.sessionUserId);
     const block = await ctx.db
       .query("blockedUsers")
       .filter((q) =>
@@ -431,25 +319,16 @@ export const unblockUser = mutation({
     }
 
     await ctx.db.delete(block._id);
-
     return { success: true };
   },
 });
 
-// Get blocked users
 export const getBlockedUsers = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await resolveSessionUser(ctx, args.sessionUserId);
     if (!user) {
       return [];
     }
@@ -478,58 +357,42 @@ export const getBlockedUsers = query({
   },
 });
 
-// Search users to start conversation
 export const searchUsersToMessage = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     searchQuery: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    const currentUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
+    const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
     if (!currentUser) {
       return [];
     }
 
-    // Get blocked users
     const blockedRelations = await ctx.db
       .query("blockedUsers")
       .withIndex("by_blockerId", (q) => q.eq("blockerId", currentUser._id))
       .collect();
-    
-    const blockedIds = new Set(blockedRelations.map((r) => r.blockedId));
-
-    // Search users
-    const allUsers = await ctx.db.query("users").collect();
-    
+    const blockedIds = new Set(blockedRelations.map((relation) => relation.blockedId));
     const searchLower = args.searchQuery.toLowerCase();
-    const filteredUsers = allUsers
-      .filter((u) => {
-        // Exclude current user and blocked users
-        if (u._id === currentUser._id) return false;
-        if (blockedIds.has(u._id)) return false;
-        
-        // Search by name or email
-        const nameMatch = u.full_name?.toLowerCase().includes(searchLower);
-        const emailMatch = u.email?.toLowerCase().includes(searchLower);
-        return nameMatch || emailMatch;
-      })
-      .map((u) => ({
-        id: u._id,
-        _id: u._id,
-        full_name: u.full_name,
-        email: u.email,
-        avatar_url: u.avatar,
-        role: u.role,
-      }));
+    const allUsers = await ctx.db.query("users").collect();
 
-    return filteredUsers.slice(0, 20);
+    return allUsers
+      .filter((user) => {
+        if (user._id === currentUser._id) return false;
+        if (blockedIds.has(user._id)) return false;
+        return (
+          user.full_name?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower)
+        );
+      })
+      .map((user) => ({
+        id: user._id,
+        _id: user._id,
+        full_name: user.full_name,
+        email: user.email,
+        avatar_url: user.avatar,
+        role: user.role,
+      }))
+      .slice(0, 20);
   },
 });

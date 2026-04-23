@@ -1,6 +1,5 @@
+import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
-import { useWarmUpBrowser } from "@/hooks/useWarmUpBrowser";
-import { useOAuth, useSignIn, useSignUp } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -17,9 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as WebBrowser from "expo-web-browser";
-
-WebBrowser.maybeCompleteAuthSession();
 
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -27,118 +23,76 @@ const isValidEmail = (email: string): boolean => {
 };
 
 export default function Login() {
-  useWarmUpBrowser();
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
-  
+  const { login, register, authError, clearAuthError } = useAuth();
+
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState<"PLAYER" | "COACH" | "SCOUT">(
+    "PLAYER",
+  );
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{
+    fullName?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
   const [showSignUp, setShowSignUp] = useState(false);
-  
-  const { signIn, setActive } = useSignIn();
-  const { signUp, setActive: setSignUpActive } = useSignUp();
-  
-  const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: "oauth_google" });
-  const { startOAuthFlow: startAppleOAuth } = useOAuth({ strategy: "oauth_apple" });
 
-  const handleGoogleSignIn = async () => {
-    try {
-      const { createdSessionId, setActive } = await startGoogleOAuth();
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
-        router.replace("/");
-      }
-    } catch (err) {
-      Alert.alert("Error", "Failed to sign in with Google");
+  const clearFieldError = (field: keyof typeof errors) => {
+    if (errors[field]) {
+      setErrors((current) => ({ ...current, [field]: undefined }));
     }
   };
 
-  const handleAppleSignIn = async () => {
-    try {
-      const { createdSessionId, setActive } = await startAppleOAuth();
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
-        router.replace("/");
-      }
-    } catch (err) {
-      Alert.alert("Error", "Failed to sign in with Apple");
-    }
-  };
+  const validate = () => {
+    const nextErrors: typeof errors = {};
 
-  const handleSignIn = async () => {
+    if (showSignUp && fullName.trim().length < 2) {
+      nextErrors.fullName = t("validation.nameMinLength");
+    }
+
     if (!email.trim() || !isValidEmail(email)) {
-      setErrors({ email: t("validation.invalidEmail") });
-      return;
+      nextErrors.email = t("validation.invalidEmail");
     }
-    
+
     if (!password || password.length < 8) {
-      setErrors({ password: t("validation.passwordMinLength") });
+      nextErrors.password = t("validation.passwordMinLength");
+    }
+
+    if (showSignUp && password !== confirmPassword) {
+      nextErrors.confirmPassword = t("validation.passwordsNotMatch");
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) {
       return;
     }
-    
+
     setIsLoading(true);
     try {
-      if (!signIn) {
-        Alert.alert(t("common.error"), "Sign in not available");
-        return;
-      }
-      const result = await signIn.create({
-        identifier: email,
-        password,
-      });
-      
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        router.replace("/");
-      }
-    } catch (err: any) {
-      Alert.alert(t("common.error"), err.errors?.[0]?.message || "Login failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      clearAuthError();
+      const result = showSignUp
+        ? await register(fullName.trim(), email.trim(), password, confirmPassword, selectedRole)
+        : await login(email.trim(), password);
 
-  const handleSignUp = async () => {
-    if (!email.trim() || !isValidEmail(email)) {
-      setErrors({ email: t("validation.invalidEmail") });
-      return;
-    }
-    
-    if (!password || password.length < 8) {
-      setErrors({ password: t("validation.passwordMinLength") });
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      if (!signUp) {
-        Alert.alert(t("common.error"), "Sign up not available");
+      if (!result.ok) {
+        Alert.alert(t("common.error"), result.error || "Ocorreu um erro inesperado.");
         return;
       }
-      const signUpResult = signUp;
-      await signUpResult.create({
-        emailAddress: email,
-        password,
-      });
-      
-      await signUpResult.prepareVerification({ strategy: "email_code" });
-      
-      Alert.alert("Verification", "A verification code was sent to your email", [
-        {
-          text: "OK",
-          onPress: () => {
-            router.push({
-              pathname: "/verify",
-              params: { email },
-            });
-          },
-        },
-      ]);
-    } catch (err: any) {
-      Alert.alert(t("common.error"), err.errors?.[0]?.message || "Registration failed");
+
+      router.replace("/");
+    } catch {
+      Alert.alert(t("common.error"), "Ocorreu um erro inesperado.");
     } finally {
       setIsLoading(false);
     }
@@ -163,35 +117,88 @@ export default function Login() {
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.socialButton, { borderColor: colors.border }]}
-            onPress={handleGoogleSignIn}
-          >
-            <Text style={[styles.socialButtonText, { color: colors.text }]}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.socialButton, { borderColor: colors.border }]}
-            onPress={handleAppleSignIn}
-          >
-            <Text style={[styles.socialButtonText, { color: colors.text }]}>
-              Continue with Apple
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.textMuted }]}>or</Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          </View>
-
           <View style={styles.form}>
+            {authError && (
+              <View
+                style={[
+                  styles.authErrorContainer,
+                  { borderColor: colors.danger, backgroundColor: `${colors.danger}14` },
+                ]}
+              >
+                <Text style={[styles.authErrorText, { color: colors.danger }]}>
+                  {authError}
+                </Text>
+              </View>
+            )}
+            {showSignUp && (
+              <>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    { borderColor: errors.fullName ? colors.danger : colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder={t("auth.fullName")}
+                    placeholderTextColor={colors.textMuted}
+                    value={fullName}
+                    onChangeText={(text) => {
+                      setFullName(text);
+                      clearFieldError("fullName");
+                    }}
+                  />
+                </View>
+                {errors.fullName && (
+                  <Text style={[styles.errorText, { color: colors.danger }]}>
+                    {errors.fullName}
+                  </Text>
+                )}
+
+                <View style={styles.roleRow}>
+                  {[
+                    { label: t("auth.accountTypes.player"), value: "PLAYER" as const },
+                    { label: t("auth.accountTypes.coach"), value: "COACH" as const },
+                    { label: t("auth.accountTypes.scout"), value: "SCOUT" as const },
+                  ].map((role) => (
+                    <TouchableOpacity
+                      key={role.value}
+                      style={[
+                        styles.roleButton,
+                        {
+                          borderColor:
+                            selectedRole === role.value ? colors.primary : colors.border,
+                          backgroundColor:
+                            selectedRole === role.value
+                              ? colors.primary
+                              : "rgba(255,255,255,0.05)",
+                        },
+                      ]}
+                      onPress={() => setSelectedRole(role.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.roleButtonText,
+                          {
+                            color:
+                              selectedRole === role.value
+                                ? colors.surface
+                                : colors.text,
+                          },
+                        ]}
+                      >
+                        {role.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
             <View
               style={[
                 styles.inputContainer,
-                { borderColor: errors.email ? colors.danger : colors.border }
+                { borderColor: errors.email ? colors.danger : colors.border },
               ]}
             >
               <TextInput
@@ -201,7 +208,7 @@ export default function Login() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  if (errors.email) setErrors({ ...errors, email: undefined });
+                  clearFieldError("email");
                 }}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -217,7 +224,7 @@ export default function Login() {
             <View
               style={[
                 styles.inputContainer,
-                { borderColor: errors.password ? colors.danger : colors.border }
+                { borderColor: errors.password ? colors.danger : colors.border },
               ]}
             >
               <TextInput
@@ -227,7 +234,7 @@ export default function Login() {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  if (errors.password) setErrors({ ...errors, password: undefined });
+                  clearFieldError("password");
                 }}
                 secureTextEntry
               />
@@ -238,13 +245,45 @@ export default function Login() {
               </Text>
             )}
 
+            {showSignUp && (
+              <>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: errors.confirmPassword
+                        ? colors.danger
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder={t("auth.confirmPassword")}
+                    placeholderTextColor={colors.textMuted}
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      setConfirmPassword(text);
+                      clearFieldError("confirmPassword");
+                    }}
+                    secureTextEntry
+                  />
+                </View>
+                {errors.confirmPassword && (
+                  <Text style={[styles.errorText, { color: colors.danger }]}>
+                    {errors.confirmPassword}
+                  </Text>
+                )}
+              </>
+            )}
+
             <TouchableOpacity
               style={[
                 styles.button,
                 { backgroundColor: colors.primary },
-                isLoading && styles.buttonDisabled
+                isLoading && styles.buttonDisabled,
               ]}
-              onPress={showSignUp ? handleSignUp : handleSignIn}
+              onPress={handleSubmit}
               disabled={isLoading}
             >
               {isLoading ? (
@@ -261,10 +300,11 @@ export default function Login() {
               onPress={() => {
                 setShowSignUp(!showSignUp);
                 setErrors({});
+                clearAuthError();
               }}
             >
               <Text style={[styles.linkText, { color: colors.primary }]}>
-                {showSignUp ? t("auth.register.hasAccount") : t("auth.register.title")}
+                {showSignUp ? t("auth.register.hasAccount") : t("auth.login.noAccount")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -294,33 +334,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
   },
-  socialButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-  },
   form: {
     width: "100%",
   },
@@ -338,10 +351,37 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
+  roleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  roleButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  roleButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
   errorText: {
     fontSize: 12,
     marginBottom: 12,
     marginLeft: 4,
+  },
+  authErrorContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  authErrorText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   button: {
     borderRadius: 12,

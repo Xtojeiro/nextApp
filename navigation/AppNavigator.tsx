@@ -43,7 +43,10 @@ export default function AppNavigator() {
   const { user, accountType, isLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
-  const convexUser = useQuery(api.users.getCurrentUser);
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
   const hasNavigated = useRef(false);
 
   useEffect(() => {

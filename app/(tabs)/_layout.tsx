@@ -11,7 +11,10 @@ const TabsLayout = () => {
   const { user, isLoading, accountType } = useAuth();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const convexUser = useQuery(api.users.getCurrentUser);
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
 
   if (isLoading) {
     return (

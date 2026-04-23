@@ -50,9 +50,18 @@ export default function TreinadorEquipa() {
   const [teamDescription, setTeamDescription] = useState("");
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
 
-  const team = useQuery(api.teams.getTeam as any, {});
-  const athletes = useQuery(api.teams.getTeamAthletes as any, {});
-  const teamStats = useQuery(api.teams.getTeamStats as any, {});
+  const team = useQuery(
+    api.teams.getTeam as any,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
+  const athletes = useQuery(
+    api.teams.getTeamAthletes as any,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
+  const teamStats = useQuery(
+    api.teams.getTeamStats as any,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
 
   const createTeam = useMutation(api.teams.createTeam as any);
   const removeAthlete = useMutation(api.teams.removeAthleteFromTeam as any);
@@ -63,7 +72,11 @@ export default function TreinadorEquipa() {
       return;
     }
     try {
-      await createTeam({ name: teamName.trim(), description: teamDescription.trim() || undefined });
+      await createTeam({
+        sessionUserId: user!.id as any,
+        name: teamName.trim(),
+        description: teamDescription.trim() || undefined,
+      });
       setTeamName("");
       setTeamDescription("");
       setCreateModalVisible(false);
@@ -85,7 +98,11 @@ export default function TreinadorEquipa() {
           style: "destructive",
           onPress: async () => {
             try {
-              await removeAthlete({ teamId: team._id, athleteId });
+              await removeAthlete({
+                sessionUserId: user!.id as any,
+                teamId: team._id,
+                athleteId,
+              });
               Alert.alert("Success", "Athlete removed from team");
             } catch (error) {
               Alert.alert("Error", (error as Error).message || "Failed to remove athlete");

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 
 const PASSWORD_MIN_LENGTH = 8;
 
@@ -8,21 +9,11 @@ async function hashPassword(password: string): Promise<string> {
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return hashHex;
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function comparePassword(hash: string, password: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const computedHash = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return hash === computedHash;
+  return hash === (await hashPassword(password));
 }
 
 function isValidEmail(email: string): boolean {
@@ -31,7 +22,13 @@ function isValidEmail(email: string): boolean {
 }
 
 function sanitizeString(str: string): string {
-  return str.replace(/[<>]/g, "");
+  return str.replace(/[<>]/g, "").trim();
+}
+
+function normalizeRole(role: string): "PLAYER" | "COACH" | "SCOUT" {
+  if (role === "athlete" || role === "PLAYER") return "PLAYER";
+  if (role === "coach" || role === "COACH") return "COACH";
+  return "SCOUT";
 }
 
 export const loginUser = mutation({
@@ -40,29 +37,25 @@ export const loginUser = mutation({
     password: v.string(),
   },
   handler: async (ctx, args) => {
-    if (!isValidEmail(sanitizeString(args.email))) {
+    const email = sanitizeString(args.email).toLowerCase();
+    if (!isValidEmail(email)) {
       throw new Error("Invalid email format");
     }
 
-    if (args.password.length === 0) {
+    if (!args.password) {
       throw new Error("Password is required");
     }
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
-    if (!user) {
-      throw new Error("Invalid email or password");
-    }
-
-    if (!user.password_hash) {
+    if (!user?.password_hash) {
       throw new Error("Invalid email or password");
     }
 
     const passwordValid = await comparePassword(user.password_hash, args.password);
-
     if (!passwordValid) {
       throw new Error("Invalid email or password");
     }
@@ -82,72 +75,11 @@ export const loginUser = mutation({
 });
 
 export const getCurrentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    return user;
-  },
-});
-
-export const createFromClerk = mutation({
   args: {
-    clerkId: v.string(),
-    email: v.string(),
-    fullName: v.string(),
+    sessionUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
-      .first();
-
-    if (existingUser) {
-      return {
-        userId: existingUser._id,
-        role: existingUser.role,
-      };
-    }
-
-    const now = Date.now();
-
-    const userId = await ctx.db.insert("users", {
-      full_name: args.fullName,
-      email: args.email.toLowerCase(),
-      clerk_id: args.clerkId,
-      role: "PLAYER",
-      is_active: true,
-      is_public: true,
-      created_at: now,
-      updated_at: now,
-    });
-
-    await ctx.db.insert("players", {
-      userId,
-      teamId: undefined,
-      position: undefined,
-      stats: {
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        points: 0,
-        assists: 0,
-        rebounds: 0,
-      },
-    });
-
-    return {
-      userId,
-      role: "PLAYER" as const,
-    };
+    return await resolveSessionUser(ctx, args.sessionUserId);
   },
 });
 
@@ -157,7 +89,14 @@ export const registerUser = mutation({
     email: v.string(),
     password: v.string(),
     confirmPassword: v.string(),
-    role: v.union(v.literal("athlete"), v.literal("coach"), v.literal("scout")),
+    role: v.union(
+      v.literal("athlete"),
+      v.literal("coach"),
+      v.literal("scout"),
+      v.literal("PLAYER"),
+      v.literal("COACH"),
+      v.literal("SCOUT"),
+    ),
     bio: v.optional(v.string()),
     location: v.optional(v.string()),
     age: v.optional(v.number()),
@@ -167,12 +106,19 @@ export const registerUser = mutation({
     phoneNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!isValidEmail(sanitizeString(args.email))) {
+    const email = sanitizeString(args.email).toLowerCase();
+    if (!isValidEmail(email)) {
       throw new Error("Invalid email format");
     }
 
+    if (sanitizeString(args.name).length < 2) {
+      throw new Error("Name must be at least 2 characters");
+    }
+
     if (args.password.length < PASSWORD_MIN_LENGTH) {
-      throw new Error(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+      throw new Error(
+        `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+      );
     }
 
     if (args.password !== args.confirmPassword) {
@@ -181,7 +127,7 @@ export const registerUser = mutation({
 
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (existingUser) {
@@ -190,18 +136,13 @@ export const registerUser = mutation({
 
     const passwordHash = await hashPassword(args.password);
     const now = Date.now();
-
-    const roleMap: Record<string, "PLAYER" | "COACH" | "SCOUT"> = {
-      athlete: "PLAYER",
-      coach: "COACH",
-      scout: "SCOUT",
-    };
+    const normalizedRole = normalizeRole(args.role);
 
     const userId = await ctx.db.insert("users", {
       full_name: sanitizeString(args.name),
-      email: args.email.toLowerCase(),
+      email,
       password_hash: passwordHash,
-      role: roleMap[args.role],
+      role: normalizedRole,
       bio: args.bio ? sanitizeString(args.bio) : undefined,
       location: args.location ? sanitizeString(args.location) : undefined,
       age: args.age,
@@ -213,7 +154,7 @@ export const registerUser = mutation({
       updated_at: now,
     });
 
-    if (args.role === "athlete") {
+    if (normalizedRole === "PLAYER") {
       await ctx.db.insert("players", {
         userId,
         teamId: undefined,
@@ -227,18 +168,19 @@ export const registerUser = mutation({
           rebounds: 0,
         },
       });
-    } else if (args.role === "coach") {
+    } else if (normalizedRole === "COACH") {
       await ctx.db.insert("coaches", {
         userId,
       });
     }
 
-    return userId;
+    return { success: true, userId, role: normalizedRole };
   },
 });
 
 export const updateUser = mutation({
   args: {
+    sessionUserId: v.id("users"),
     name: v.optional(v.string()),
     bio: v.optional(v.string()),
     location: v.optional(v.string()),
@@ -249,28 +191,19 @@ export const updateUser = mutation({
     phoneNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    const user = await requireSessionUser(ctx, args.sessionUserId);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const updateData: any = {};
+    const updateData: Record<string, any> = {
+      updated_at: Date.now(),
+    };
     if (args.name !== undefined) updateData.full_name = sanitizeString(args.name);
     if (args.bio !== undefined) updateData.bio = sanitizeString(args.bio);
-    if (args.location !== undefined) updateData.location = sanitizeString(args.location);
+    if (args.location !== undefined) {
+      updateData.location = sanitizeString(args.location);
+    }
     if (args.age !== undefined) updateData.age = args.age;
     if (args.gender !== undefined) updateData.gender = args.gender;
     if (args.phoneNumber !== undefined) updateData.push_token = args.phoneNumber;
-    updateData.updated_at = Date.now();
 
     await ctx.db.patch(user._id, updateData);
     return { success: true };
@@ -278,36 +211,22 @@ export const updateUser = mutation({
 });
 
 export const generateUploadUrl = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
+  args: {
+    sessionUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    await requireSessionUser(ctx, args.sessionUserId);
     return await ctx.storage.generateUploadUrl();
   },
 });
 
 export const updateAvatar = mutation({
   args: {
+    sessionUserId: v.id("users"),
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
+    const user = await requireSessionUser(ctx, args.sessionUserId);
     const url = await ctx.storage.getUrl(args.storageId);
     if (!url) {
       throw new Error("Failed to get avatar URL");
@@ -323,59 +242,39 @@ export const updateAvatar = mutation({
 });
 
 export const toggleProfileVisibility = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+  args: {
+    sessionUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
+    const nextVisibility = !user.is_public;
 
     await ctx.db.patch(user._id, {
-      is_public: !user.is_public,
+      is_public: nextVisibility,
       updated_at: Date.now(),
     });
 
-    return { is_public: !user.is_public };
+    return { success: true, is_public: nextVisibility };
   },
 });
 
 export const getProfileVisibility = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     let targetUserId = args.userId;
-
     if (!targetUserId) {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
+      const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
+      if (!currentUser) {
         return false;
       }
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email!))
-        .first();
-      if (!user) {
-        return false;
-      }
-      targetUserId = user._id;
+      targetUserId = currentUser._id;
     }
 
-    const user = await ctx.db.get(targetUserId);
-    if (!user) {
-      return false;
-    }
-
-    return user.is_public;
+    const user = (await ctx.db.get(targetUserId!)) as any;
+    return user?.is_public ?? false;
   },
 });
 
@@ -386,49 +285,38 @@ export const searchUsers = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
-    const sanitizedQuery = sanitizeString(args.query);
-
+    const sanitizedQuery = sanitizeString(args.query).toLowerCase();
     const publicUsers = await ctx.db.query("users").collect();
 
-    const filteredUsers = publicUsers.filter(
-      (user) =>
-        user.is_public &&
-        (user.full_name.toLowerCase().includes(sanitizedQuery.toLowerCase()) ||
-          user.bio?.toLowerCase().includes(sanitizedQuery.toLowerCase()) ||
-          user.location?.toLowerCase().includes(sanitizedQuery.toLowerCase())),
-    );
-
-    return filteredUsers.slice(0, limit);
+    return publicUsers
+      .filter(
+        (user) =>
+          user.is_public &&
+          (user.full_name.toLowerCase().includes(sanitizedQuery) ||
+            user.bio?.toLowerCase().includes(sanitizedQuery) ||
+            user.location?.toLowerCase().includes(sanitizedQuery)),
+      )
+      .slice(0, limit);
   },
 });
 
 export const getTeamAthletes = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
+    const coach = await resolveSessionUser(ctx, args.sessionUserId);
     if (!coach || coach.role !== "COACH") {
       return [];
     }
 
     let targetTeamId = args.teamId;
-
     if (!targetTeamId) {
       const coachProfile = await ctx.db
         .query("coaches")
         .withIndex("by_userId", (q) => q.eq("userId", coach._id))
         .first();
-
       if (coachProfile?.teamId) {
         targetTeamId = coachProfile.teamId;
       }
@@ -443,73 +331,60 @@ export const getTeamAthletes = query({
       .withIndex("by_teamId", (q) => q.eq("teamId", targetTeamId))
       .collect();
 
-    const users = await Promise.all(
-      players.map(async (player) => {
-        return await ctx.db.get(player.userId);
-      }),
-    );
-
+    const users = await Promise.all(players.map((player) => ctx.db.get(player.userId)));
     return users.filter(Boolean);
   },
 });
 
 export const addAthleteNote = mutation({
   args: {
+    sessionUserId: v.id("users"),
     athleteId: v.id("users"),
     note: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!coach || coach.role !== "COACH") {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
       throw new Error("Not authorized");
     }
 
-    return { success: true };
+    return {
+      success: true,
+      athleteId: args.athleteId,
+      note: sanitizeString(args.note),
+    };
   },
 });
 
 export const getPlayerStats = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     let targetUserId = args.userId;
-
     if (!targetUserId) {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
-      }
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email!))
-        .first();
+      const user = await resolveSessionUser(ctx, args.sessionUserId);
       if (!user) {
-        return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
+        return {
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          points: 0,
+          assists: 0,
+          rebounds: 0,
+        };
       }
       targetUserId = user._id;
     }
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_userId", (q) => q.eq("userId", targetUserId))
+      .withIndex("by_userId", (q) => q.eq("userId", targetUserId!))
       .first();
 
-    if (!player) {
-      return { gamesPlayed: 0, wins: 0, losses: 0, points: 0, assists: 0, rebounds: 0 };
-    }
-
     return (
-      player.stats || {
+      player?.stats || {
         gamesPlayed: 0,
         wins: 0,
         losses: 0,
@@ -522,18 +397,11 @@ export const getPlayerStats = query({
 });
 
 export const getCoachDashboard = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return { totalAthletes: 0, recentWorkouts: 0, upcomingEvents: 0, athletes: [] };
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const coach = await resolveSessionUser(ctx, args.sessionUserId);
     if (!coach || coach.role !== "COACH") {
       return { totalAthletes: 0, recentWorkouts: 0, upcomingEvents: 0, athletes: [] };
     }
@@ -572,29 +440,14 @@ export const getCoachDashboard = query({
   },
 });
 
-// Delete user account
 export const deleteAccount = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
+  args: {
+    sessionUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
     const userId = user._id;
 
-    // Delete related data
-    
-    // Delete player's profile if exists
     const playerProfile = await ctx.db
       .query("players")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -603,7 +456,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(playerProfile._id);
     }
 
-    // Delete coach's profile if exists
     const coachProfile = await ctx.db
       .query("coaches")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -612,7 +464,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(coachProfile._id);
     }
 
-    // Delete posts
     const posts = await ctx.db
       .query("posts")
       .withIndex("by_user_id", (q) => q.eq("user_id", userId))
@@ -621,7 +472,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(post._id);
     }
 
-    // Delete workout logs
     const workoutLogs = await ctx.db
       .query("workoutLogs")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -630,7 +480,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(log._id);
     }
 
-    // Delete workouts
     const workouts = await ctx.db
       .query("workouts")
       .withIndex("by_user_id", (q) => q.eq("user_id", userId))
@@ -639,7 +488,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(workout._id);
     }
 
-    // Delete follows (as follower)
     const followsAsFollower = await ctx.db
       .query("follows")
       .withIndex("by_follower_id", (q) => q.eq("follower_id", userId))
@@ -648,7 +496,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(follow._id);
     }
 
-    // Delete follows (as following)
     const followsAsFollowing = await ctx.db
       .query("follows")
       .withIndex("by_following_id", (q) => q.eq("following_id", userId))
@@ -657,7 +504,6 @@ export const deleteAccount = mutation({
       await ctx.db.delete(follow._id);
     }
 
-    // Delete blocked users
     const blockedByUser = await ctx.db
       .query("blockedUsers")
       .withIndex("by_blockerId", (q) => q.eq("blockerId", userId))
@@ -674,43 +520,41 @@ export const deleteAccount = mutation({
       await ctx.db.delete(blocked._id);
     }
 
-    // Delete conversations and messages
     const conversations = await ctx.db.query("conversations").collect();
     const userConversations = conversations.filter(
-      (c) => c.user_one_id === userId || c.user_two_id === userId
+      (conversation) =>
+        conversation.user_one_id === userId || conversation.user_two_id === userId,
     );
-    for (const conv of userConversations) {
+    for (const conversation of userConversations) {
       const messages = await ctx.db
         .query("messages")
-        .withIndex("by_conversation_id", (q) => q.eq("conversation_id", conv._id))
+        .withIndex("by_conversation_id", (q) =>
+          q.eq("conversation_id", conversation._id),
+        )
         .collect();
-      for (const msg of messages) {
-        await ctx.db.delete(msg._id);
+      for (const message of messages) {
+        await ctx.db.delete(message._id);
       }
-      await ctx.db.delete(conv._id);
+      await ctx.db.delete(conversation._id);
     }
 
-    // Delete notifications
     const notifications = await ctx.db
       .query("notifications")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
-    for (const notif of notifications) {
-      await ctx.db.delete(notif._id);
+    for (const notification of notifications) {
+      await ctx.db.delete(notification._id);
     }
 
-    // Delete user achievements
     const userAchievements = await ctx.db
       .query("userAchievements")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
-    for (const ua of userAchievements) {
-      await ctx.db.delete(ua._id);
+    for (const achievement of userAchievements) {
+      await ctx.db.delete(achievement._id);
     }
 
-    // Delete user
     await ctx.db.delete(userId);
-
     return { success: true };
   },
 });

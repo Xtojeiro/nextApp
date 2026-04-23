@@ -1,13 +1,15 @@
 import { api } from "@/convex/_generated/api";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
+  Modal,
   StatusBar,
   Text,
   TextInput,
@@ -16,118 +18,150 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type Workout = {
-  _id: any;
-  name: string;
-  type: any;
-  duration_minutes?: number;
-  objective?: string;
-  status: any;
-  exercises?: Array<{
-    name: string;
-    sets?: number;
-    reps?: number;
-    weight_kg?: number;
-  }>;
+type Workout = Doc<"workouts">;
+
+const emptyWorkoutForm = {
+  name: "",
+  description: "",
+  duration: "",
+  difficulty: "beginner" as "beginner" | "intermediate" | "advanced",
+  scheduledDate: "",
 };
 
 export default function Treinos() {
   const { colors } = useTheme();
-  const { t } = useTranslation();
   const { user } = useAuth();
-  const workouts = useQuery(api.workouts.getWorkouts as any, {}) || [];
-  const startWorkoutMutation = useMutation(api.workouts.startWorkout as any);
-  const completeWorkoutMutation = useMutation(api.workouts.completeWorkout as any);
-  const createWorkoutMutation = useMutation(api.workouts.createWorkout as any);
-
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "gym" | "football">(
-    "all",
+  const workoutsQuery = useQuery(
+    api.workouts.getWorkouts,
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
   );
-  const [currentWorkout, setCurrentWorkout] = useState<Workout | null>(null);
+  const workouts = workoutsQuery ?? [];
+  const createWorkout = useMutation(api.workouts.createWorkout);
+  const startWorkout = useMutation(api.workouts.startWorkout);
+  const completeWorkout = useMutation(api.workouts.completeWorkout);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [timer, setTimer] = useState(0);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [formData, setFormData] = useState<any>({});
-  const [createData, setCreateData] = useState({
-    name: "",
-    type: "gym" as "gym" | "football",
-    duration_minutes: "",
-    objective: "",
-  });
+  const [completionNotes, setCompletionNotes] = useState("");
+  const [form, setForm] = useState(emptyWorkoutForm);
 
   useEffect(() => {
-    let interval: any;
-    if (isExecuting) {
-      interval = setInterval(() => setTimer((t) => t + 1), 1000);
-    }
+    if (!activeWorkout) return;
+    const interval = setInterval(() => setTimer((current) => current + 1), 1000);
     return () => clearInterval(interval);
-  }, [isExecuting]);
+  }, [activeWorkout]);
 
-  const filteredWorkouts = workouts.filter((workout: any) => {
-    const matchesSearch = workout.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesType = filterType === "all" || workout.type === filterType;
-    return matchesSearch && matchesType;
-  });
+  const groupedWorkouts = {
+    scheduled: workouts.filter((workout) => workout.status === "scheduled"),
+    inProgress: workouts.filter((workout) => workout.status === "in_progress"),
+    completed: workouts.filter((workout) => workout.status === "completed"),
+    skipped: workouts.filter((workout) => workout.status === "skipped"),
+  };
 
-  const handleStartWorkout = async (workout: Workout) => {
-    try {
-      await startWorkoutMutation({ workoutId: workout._id as any });
-      setCurrentWorkout(workout);
-      setIsExecuting(true);
-      setTimer(0);
-    } catch (error) {
-      Alert.alert("Error", "Failed to start workout");
+  const resetCreateModal = () => {
+    setShowCreateModal(false);
+    setForm(emptyWorkoutForm);
+  };
+
+  const getStatusLabel = (status: Workout["status"]) => {
+    switch (status) {
+      case "scheduled":
+        return "Agendado";
+      case "in_progress":
+        return "Em curso";
+      case "completed":
+        return "Concluído";
+      case "skipped":
+        return "Falhado";
     }
   };
 
-  const handleFinishWorkout = () => {
-    setIsExecuting(false);
-    setShowForm(true);
-  };
-
-  const handleSubmitForm = async () => {
-    if (!currentWorkout) return;
-    try {
-      await completeWorkoutMutation({
-        workoutId: currentWorkout._id,
-        type: currentWorkout.type,
-        ...formData,
-        total_time_minutes: Math.floor(timer / 60),
-      });
-      setCurrentWorkout(null);
-      setShowForm(false);
-      setFormData({});
-      setTimer(0);
-      Alert.alert("Success", "Workout completed!");
-    } catch (error) {
-      Alert.alert("Error", "Failed to complete workout");
+  const getStatusColor = (status: Workout["status"]) => {
+    switch (status) {
+      case "scheduled":
+        return colors.primary;
+      case "in_progress":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "skipped":
+        return colors.danger;
     }
   };
 
   const handleCreateWorkout = async () => {
+    if (!user) return;
+    if (!form.name.trim()) {
+      Alert.alert("Erro", "O nome do treino é obrigatório.");
+      return;
+    }
+
+    const durationValue = form.duration ? Number(form.duration) : undefined;
+    if (
+      form.duration &&
+      (durationValue === undefined || !Number.isFinite(durationValue) || durationValue <= 0)
+    ) {
+      Alert.alert("Erro", "A duração tem de ser um número válido.");
+      return;
+    }
+
+    const scheduledDate = form.scheduledDate
+      ? new Date(form.scheduledDate).getTime()
+      : undefined;
+
+    if (form.scheduledDate && Number.isNaN(scheduledDate)) {
+      Alert.alert("Erro", "A data agendada não é válida.");
+      return;
+    }
+
     try {
-      await createWorkoutMutation({
-        name: createData.name,
-        type: createData.type,
-        duration_minutes: createData.duration_minutes
-          ? parseInt(createData.duration_minutes)
-          : undefined,
-        objective: createData.objective || undefined,
+      await createWorkout({
+        sessionUserId: user.id as Id<"users">,
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        exercises: [],
+        scheduledDate,
+        duration: durationValue,
+        difficulty: form.difficulty,
       });
-      setShowCreate(false);
-      setCreateData({
-        name: "",
-        type: "gym",
-        duration_minutes: "",
-        objective: "",
-      });
-      Alert.alert("Success", "Workout created!");
+      resetCreateModal();
+      Alert.alert("Sucesso", "Treino criado.");
     } catch (error) {
-      Alert.alert("Error", "Failed to create workout");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao criar treino.");
+    }
+  };
+
+  const handleStartWorkout = async (workout: Workout) => {
+    if (!user) return;
+    try {
+      await startWorkout({
+        sessionUserId: user.id as Id<"users">,
+        workoutId: workout._id,
+      });
+      setActiveWorkout(workout);
+      setTimer(0);
+      setCompletionNotes("");
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao iniciar treino.");
+    }
+  };
+
+  const handleCompleteWorkout = async () => {
+    if (!user || !activeWorkout) return;
+    try {
+      await completeWorkout({
+        sessionUserId: user.id as Id<"users">,
+        workoutId: activeWorkout._id,
+        actualDuration: Math.max(1, Math.round(timer / 60)),
+        notes: completionNotes.trim() || undefined,
+      });
+      setActiveWorkout(null);
+      setTimer(0);
+      setCompletionNotes("");
+      Alert.alert("Sucesso", "Treino concluído.");
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao concluir treino.");
     }
   };
 
@@ -135,705 +169,124 @@ export default function Treinos() {
     <View
       style={{
         backgroundColor: colors.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
-        marginVertical: 8,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        elevation: 3,
+        marginBottom: 12,
       }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.text }}>
-          {item.name}
-        </Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>
+            {item.name}
+          </Text>
+          {item.objective ? (
+            <Text style={{ color: colors.textMuted, marginTop: 4 }}>{item.objective}</Text>
+          ) : null}
+          <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+            {item.duration_minutes || 0} min
+          </Text>
+          {item.scheduledDate ? (
+            <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+              Agendado para {new Date(item.scheduledDate).toLocaleString("pt-PT")}
+            </Text>
+          ) : null}
+        </View>
         <View
           style={{
-            backgroundColor:
-              item.type === "gym" ? colors.primary : colors.success,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderRadius: 12,
+            backgroundColor: getStatusColor(item.status),
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 999,
           }}
         >
-          <Text style={{ color: "white", fontSize: 12 }}>
-            {item.type === "gym" ? t("treinos.gym") : t("treinos.football")}
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>
+            {getStatusLabel(item.status)}
           </Text>
         </View>
       </View>
-      <Text style={{ color: colors.textMuted, marginTop: 4 }}>
-        {t("treinos.duration")}: {item.duration_minutes || 0} min
-      </Text>
-      {item.objective && (
-        <Text style={{ color: colors.textMuted, marginTop: 4 }}>
-          {t("treinos.objective")}: {item.objective}
-        </Text>
-      )}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 12,
-        }}
-      >
-        <Text
+
+      {item.status === "scheduled" || item.status === "in_progress" ? (
+        <TouchableOpacity
           style={{
-            color:
-              item.status === "completed"
-                ? colors.success
-                : item.status === "in_progress"
-                  ? colors.warning
-                  : colors.textMuted,
-            fontWeight: "bold",
+            backgroundColor: colors.primary,
+            paddingVertical: 10,
+            borderRadius: 10,
+            alignItems: "center",
           }}
+          onPress={() => handleStartWorkout(item)}
         >
-          {item.status === "planned"
-            ? t("treinos.planned")
-            : item.status === "in_progress"
-              ? t("treinos.inProgress")
-              : t("treinos.completed")}
-        </Text>
-        {item.status === "planned" && (
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 8,
-            }}
-            onPress={() => handleStartWorkout(item)}
-          >
-            <Text style={{ color: "white", fontWeight: "bold" }}>
-              {t("treinos.startWorkout")}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          <Text style={{ color: "white", fontWeight: "700" }}>
+            {item.status === "in_progress" ? "Retomar" : "Iniciar"}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 
-  if (isExecuting && currentWorkout) {
+  if (activeWorkout) {
     return (
       <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
         <StatusBar barStyle={colors.statusBarStyle} />
         <SafeAreaView style={{ flex: 1, padding: 20 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: colors.text,
-              marginBottom: 20,
-            }}
-          >
-            {currentWorkout.name}
+          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+            {activeWorkout.name}
           </Text>
-          <Text
-            style={{
-              fontSize: 48,
-              fontWeight: "bold",
-              color: colors.primary,
-              textAlign: "center",
-              marginBottom: 20,
-            }}
-          >
+          <Text style={{ color: colors.primary, fontSize: 56, fontWeight: "700", marginTop: 24 }}>
             {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, "0")}
           </Text>
-          <Text
-            style={{
-              fontSize: 18,
-              color: colors.text,
-              textAlign: "center",
-              marginBottom: 40,
-            }}
-          >
-            {t("treinos.timer")}
+          <Text style={{ color: colors.textMuted, marginTop: 8 }}>
+            Cronómetro do treino em curso.
           </Text>
-          {currentWorkout.exercises && (
-            <FlatList
-              data={currentWorkout.exercises}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
-                <View
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 16,
-                    marginVertical: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: colors.text,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {item.name}
-                  </Text>
-                  <Text style={{ color: colors.textMuted }}>
-                    {item.sets} {t("treinos.sets")} x {item.reps}{" "}
-                    {t("treinos.reps")}
-                    {item.weight_kg && ` @ ${item.weight_kg}kg`}
-                  </Text>
-                </View>
-              )}
-            />
-          )}
+
+          <TextInput
+            value={completionNotes}
+            onChangeText={setCompletionNotes}
+            placeholder="Notas finais do treino"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 14,
+              color: colors.text,
+              marginTop: 24,
+              height: 120,
+              textAlignVertical: "top",
+            }}
+          />
+
           <TouchableOpacity
             style={{
               backgroundColor: colors.success,
-              padding: 16,
-              borderRadius: 12,
-              alignItems: "center",
-              marginTop: 40,
-            }}
-            onPress={handleFinishWorkout}
-          >
-            <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
-              {t("treinos.finishWorkout")}
-            </Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
-
-  if (showForm && currentWorkout) {
-    return (
-      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-        <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, padding: 20 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: colors.text,
-              marginBottom: 20,
-            }}
-          >
-            {t("treinos.finishWorkout")}
-          </Text>
-          <Text style={{ color: colors.textMuted, marginBottom: 20 }}>
-            {t("treinos.type")}:{" "}
-            {currentWorkout.type === "gym"
-              ? t("treinos.gym")
-              : t("treinos.football")}
-          </Text>
-          {/* Form fields based on type */}
-          {currentWorkout.type === "gym" ? (
-            <View>
-              {/* Gym form */}
-              <Text style={{ color: colors.text, marginBottom: 8 }}>
-                {t("treinos.exercisesDone")}
-              </Text>
-              {currentWorkout.exercises?.map((exercise, index) => (
-                <View
-                  key={index}
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text style={{ color: colors.text, fontWeight: "bold" }}>
-                    {exercise.name}
-                  </Text>
-                  <View style={{ flexDirection: "row", marginTop: 8 }}>
-                    <TextInput
-                      placeholder={t("treinos.sets")}
-                      defaultValue={exercise.sets?.toString()}
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderRadius: 4,
-                        padding: 8,
-                        color: colors.text,
-                        flex: 1,
-                        marginRight: 4,
-                      }}
-                      keyboardType="numeric"
-                      onChangeText={(text) => {
-                        const exercises = [
-                          ...(formData.exercises_done ||
-                            currentWorkout.exercises ||
-                            []),
-                        ];
-                        exercises[index] = {
-                          ...exercises[index],
-                          sets: parseInt(text) || 0,
-                        };
-                        setFormData({ ...formData, exercises_done: exercises });
-                      }}
-                    />
-                    <TextInput
-                      placeholder={t("treinos.reps")}
-                      defaultValue={exercise.reps?.toString()}
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderRadius: 4,
-                        padding: 8,
-                        color: colors.text,
-                        flex: 1,
-                        marginHorizontal: 4,
-                      }}
-                      keyboardType="numeric"
-                      onChangeText={(text) => {
-                        const exercises = [
-                          ...(formData.exercises_done ||
-                            currentWorkout.exercises ||
-                            []),
-                        ];
-                        exercises[index] = {
-                          ...exercises[index],
-                          reps: parseInt(text) || 0,
-                        };
-                        setFormData({ ...formData, exercises_done: exercises });
-                      }}
-                    />
-                    <TextInput
-                      placeholder={t("treinos.weight")}
-                      defaultValue={exercise.weight_kg?.toString()}
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderRadius: 4,
-                        padding: 8,
-                        color: colors.text,
-                        flex: 1,
-                        marginLeft: 4,
-                      }}
-                      keyboardType="numeric"
-                      onChangeText={(text) => {
-                        const exercises = [
-                          ...(formData.exercises_done ||
-                            currentWorkout.exercises ||
-                            []),
-                        ];
-                        exercises[index] = {
-                          ...exercises[index],
-                          weight_kg: parseFloat(text) || 0,
-                        };
-                        setFormData({ ...formData, exercises_done: exercises });
-                      }}
-                    />
-                  </View>
-                </View>
-              ))}
-              <TextInput
-                placeholder={t("treinos.rpe")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                keyboardType="numeric"
-                onChangeText={(text) =>
-                  setFormData({ ...formData, rpe: parseInt(text) })
-                }
-              />
-              <Text style={{ color: colors.text, marginBottom: 8 }}>
-                {t("treinos.muscleSensation")}
-              </Text>
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                {["leve", "normal", "fadiga"].map((sensation) => (
-                  <TouchableOpacity
-                    key={sensation}
-                    style={{
-                      backgroundColor:
-                        formData.muscle_sensation === sensation
-                          ? colors.primary
-                          : colors.surface,
-                      padding: 8,
-                      borderRadius: 8,
-                      marginRight: 8,
-                    }}
-                    onPress={() =>
-                      setFormData({ ...formData, muscle_sensation: sensation })
-                    }
-                  >
-                    <Text
-                      style={{
-                        color:
-                          formData.muscle_sensation === sensation
-                            ? "white"
-                            : colors.text,
-                      }}
-                    >
-                      {t(`treinos.${sensation}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                placeholder={t("treinos.notes")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                  height: 80,
-                }}
-                multiline
-                onChangeText={(text) =>
-                  setFormData({ ...formData, notes: text })
-                }
-              />
-            </View>
-          ) : (
-            <View>
-              {/* Football form */}
-              <Text style={{ color: colors.text, marginBottom: 8 }}>
-                {t("treinos.sessionType")}
-              </Text>
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                {["tecnico", "tatico", "fisico", "jogo"].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={{
-                      backgroundColor:
-                        formData.session_type === type
-                          ? colors.primary
-                          : colors.surface,
-                      padding: 8,
-                      borderRadius: 8,
-                      marginRight: 8,
-                    }}
-                    onPress={() =>
-                      setFormData({ ...formData, session_type: type })
-                    }
-                  >
-                    <Text
-                      style={{
-                        color:
-                          formData.session_type === type
-                            ? "white"
-                            : colors.text,
-                      }}
-                    >
-                      {t(`treinos.${type}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                placeholder={t("treinos.totalTime")}
-                defaultValue={Math.floor(timer / 60).toString()}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                keyboardType="numeric"
-                onChangeText={(text) =>
-                  setFormData({
-                    ...formData,
-                    total_duration_minutes: parseInt(text),
-                  })
-                }
-              />
-              <TextInput
-                placeholder={t("treinos.distance")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                keyboardType="numeric"
-                onChangeText={(text) =>
-                  setFormData({ ...formData, distance_km: parseFloat(text) })
-                }
-              />
-              <Text style={{ color: colors.text, marginBottom: 8 }}>
-                {t("treinos.intensity")}
-              </Text>
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                {["baixa", "media", "alta"].map((intensity) => (
-                  <TouchableOpacity
-                    key={intensity}
-                    style={{
-                      backgroundColor:
-                        formData.intensity === intensity
-                          ? colors.primary
-                          : colors.surface,
-                      padding: 8,
-                      borderRadius: 8,
-                      marginRight: 8,
-                    }}
-                    onPress={() => setFormData({ ...formData, intensity })}
-                  >
-                    <Text
-                      style={{
-                        color:
-                          formData.intensity === intensity
-                            ? "white"
-                            : colors.text,
-                      }}
-                    >
-                      {t(`treinos.${intensity}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={{ color: colors.text, marginBottom: 8 }}>
-                {t("treinos.playedGame")}
-              </Text>
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: formData.played_game
-                      ? colors.primary
-                      : colors.surface,
-                    padding: 8,
-                    borderRadius: 8,
-                    marginRight: 8,
-                  }}
-                  onPress={() =>
-                    setFormData({ ...formData, played_game: true })
-                  }
-                >
-                  <Text
-                    style={{
-                      color: formData.played_game ? "white" : colors.text,
-                    }}
-                  >
-                    {t("treinos.yes")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: !formData.played_game
-                      ? colors.primary
-                      : colors.surface,
-                    padding: 8,
-                    borderRadius: 8,
-                  }}
-                  onPress={() =>
-                    setFormData({ ...formData, played_game: false })
-                  }
-                >
-                  <Text
-                    style={{
-                      color: !formData.played_game ? "white" : colors.text,
-                    }}
-                  >
-                    {t("treinos.no")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                placeholder={t("treinos.position")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, position: text })
-                }
-              />
-              <TextInput
-                placeholder={t("treinos.physicalSensation")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                }}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, physical_sensation: text })
-                }
-              />
-              <TextInput
-                placeholder={t("treinos.notes")}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 8,
-                  padding: 12,
-                  color: colors.text,
-                  marginBottom: 16,
-                  height: 80,
-                }}
-                multiline
-                onChangeText={(text) =>
-                  setFormData({ ...formData, notes: text })
-                }
-              />
-            </View>
-          )}
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              padding: 16,
+              paddingVertical: 14,
               borderRadius: 12,
               alignItems: "center",
               marginTop: 20,
             }}
-            onPress={handleSubmitForm}
+            onPress={handleCompleteWorkout}
           >
-            <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
-              {t("treinos.submit")}
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+              Concluir treino
             </Text>
           </TouchableOpacity>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
-
-  if (showCreate) {
-    return (
-      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-        <StatusBar barStyle={colors.statusBarStyle} />
-        <SafeAreaView style={{ flex: 1, padding: 20 }}>
-          <Text
+          <TouchableOpacity
             style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: colors.text,
-              marginBottom: 20,
+              backgroundColor: colors.surface,
+              paddingVertical: 14,
+              borderRadius: 12,
+              alignItems: "center",
+              marginTop: 12,
+            }}
+            onPress={() => {
+              setActiveWorkout(null);
+              setTimer(0);
+              setCompletionNotes("");
             }}
           >
-            {t("treinos.newWorkout")}
-          </Text>
-          <TextInput
-            placeholder="Nome do treino"
-            value={createData.name}
-            onChangeText={(text) =>
-              setCreateData({ ...createData, name: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-          />
-          <Text style={{ color: colors.text, marginBottom: 8 }}>Tipo</Text>
-          <View style={{ flexDirection: "row", marginBottom: 16 }}>
-            <TouchableOpacity
-              style={{
-                backgroundColor:
-                  createData.type === "gym" ? colors.primary : colors.surface,
-                padding: 12,
-                borderRadius: 8,
-                marginRight: 8,
-                flex: 1,
-              }}
-              onPress={() => setCreateData({ ...createData, type: "gym" })}
-            >
-              <Text
-                style={{
-                  color: createData.type === "gym" ? "white" : colors.text,
-                  textAlign: "center",
-                }}
-              >
-                {t("treinos.gym")}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor:
-                  createData.type === "football"
-                    ? colors.primary
-                    : colors.surface,
-                padding: 12,
-                borderRadius: 8,
-                flex: 1,
-              }}
-              onPress={() => setCreateData({ ...createData, type: "football" })}
-            >
-              <Text
-                style={{
-                  color: createData.type === "football" ? "white" : colors.text,
-                  textAlign: "center",
-                }}
-              >
-                {t("treinos.football")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            placeholder={t("treinos.duration")}
-            value={createData.duration_minutes}
-            onChangeText={(text) =>
-              setCreateData({ ...createData, duration_minutes: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-            keyboardType="numeric"
-          />
-          <TextInput
-            placeholder={t("treinos.objective")}
-            value={createData.objective}
-            onChangeText={(text) =>
-              setCreateData({ ...createData, objective: text })
-            }
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 8,
-              padding: 12,
-              color: colors.text,
-              marginBottom: 20,
-            }}
-          />
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.danger,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginRight: 8,
-                alignItems: "center",
-              }}
-              onPress={() => setShowCreate(false)}
-            >
-              <Text
-                style={{ color: "white", fontSize: 16, fontWeight: "bold" }}
-              >
-                Cancelar
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primary,
-                padding: 16,
-                borderRadius: 12,
-                flex: 1,
-                marginLeft: 8,
-                alignItems: "center",
-              }}
-              onPress={handleCreateWorkout}
-            >
-              <Text
-                style={{ color: "white", fontSize: 16, fontWeight: "bold" }}
-              >
-                Criar
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16 }}>
+              Fechar
+            </Text>
+          </TouchableOpacity>
         </SafeAreaView>
       </LinearGradient>
     );
@@ -843,122 +296,167 @@ export default function Treinos() {
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={{ padding: 20, paddingBottom: 10 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{ fontSize: 24, fontWeight: "bold", color: colors.text }}
-            >
-              {t("treinos.title")}
-            </Text>
+        <View style={{ padding: 20, paddingBottom: 12 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+                Treinos
+              </Text>
+              <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+                {groupedWorkouts.scheduled.length} agendados • {groupedWorkouts.completed.length} concluídos
+              </Text>
+            </View>
             <TouchableOpacity
               style={{
                 backgroundColor: colors.primary,
                 paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: 8,
+                paddingVertical: 10,
+                borderRadius: 10,
               }}
-              onPress={() => setShowCreate(true)}
+              onPress={() => setShowCreateModal(true)}
             >
-              <Text style={{ color: "white", fontWeight: "bold" }}>
-                + {t("treinos.newWorkout")}
-              </Text>
+              <Text style={{ color: "white", fontWeight: "700" }}>+ Treino</Text>
             </TouchableOpacity>
           </View>
-          {/* Filters */}
-          <View style={{ marginTop: 16 }}>
-            <TextInput
-              placeholder={t("treinos.search")}
-              value={search}
-              onChangeText={setSearch}
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 8,
-                padding: 12,
-                color: colors.text,
-                marginBottom: 8,
-              }}
-            />
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
-              <TouchableOpacity
-                style={{
-                  backgroundColor:
-                    filterType === "all" ? colors.primary : colors.surface,
-                  padding: 8,
-                  borderRadius: 8,
-                  flex: 1,
-                  marginRight: 4,
-                }}
-                onPress={() => setFilterType("all")}
-              >
-                <Text
-                  style={{
-                    color: filterType === "all" ? "white" : colors.text,
-                    textAlign: "center",
-                  }}
-                >
-                  All
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  backgroundColor:
-                    filterType === "gym" ? colors.primary : colors.surface,
-                  padding: 8,
-                  borderRadius: 8,
-                  flex: 1,
-                  marginHorizontal: 4,
-                }}
-                onPress={() => setFilterType("gym")}
-              >
-                <Text
-                  style={{
-                    color: filterType === "gym" ? "white" : colors.text,
-                    textAlign: "center",
-                  }}
-                >
-                  {t("treinos.gym")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  backgroundColor:
-                    filterType === "football" ? colors.primary : colors.surface,
-                  padding: 8,
-                  borderRadius: 8,
-                  flex: 1,
-                  marginLeft: 4,
-                }}
-                onPress={() => setFilterType("football")}
-              >
-                <Text
-                  style={{
-                    color: filterType === "football" ? "white" : colors.text,
-                    textAlign: "center",
-                  }}
-                >
-                  {t("treinos.football")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
-        {/* Workout List */}
+
         <FlatList
-          data={filteredWorkouts}
+          data={workouts}
           keyExtractor={(item) => item._id}
           renderItem={renderWorkoutCard}
-          contentContainerStyle={{ padding: 20, paddingTop: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+          ListEmptyComponent={
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderRadius: 16,
+                padding: 24,
+                alignItems: "center",
+                marginTop: 20,
+              }}
+            >
+              <Ionicons name="barbell-outline" size={42} color={colors.textMuted} />
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginTop: 12 }}>
+                Ainda não tens treinos
+              </Text>
+              <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 6 }}>
+                Cria um treino novo ou agenda um para mais tarde.
+              </Text>
+            </View>
+          }
         />
+
+        <Modal visible={showCreateModal} animationType="slide" onRequestClose={resetCreateModal}>
+          <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, padding: 20 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 20,
+                }}
+              >
+                <TouchableOpacity onPress={resetCreateModal}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700" }}>
+                  Novo treino
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              <TextInput
+                value={form.name}
+                onChangeText={(text) => setForm((current) => ({ ...current, name: text }))}
+                placeholder="Nome"
+                placeholderTextColor={colors.textMuted}
+                style={workoutInputStyle(colors)}
+              />
+              <TextInput
+                value={form.description}
+                onChangeText={(text) => setForm((current) => ({ ...current, description: text }))}
+                placeholder="Descrição"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={[workoutInputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+              />
+              <TextInput
+                value={form.duration}
+                onChangeText={(text) => setForm((current) => ({ ...current, duration: text }))}
+                placeholder="Duração em minutos"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                style={workoutInputStyle(colors)}
+              />
+              <TextInput
+                value={form.scheduledDate}
+                onChangeText={(text) => setForm((current) => ({ ...current, scheduledDate: text }))}
+                placeholder="Agendar para (opcional, ex: 2026-04-22T18:00)"
+                placeholderTextColor={colors.textMuted}
+                style={workoutInputStyle(colors)}
+              />
+
+              <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
+                Dificuldade
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+                {(["beginner", "intermediate", "advanced"] as const).map((difficulty) => (
+                  <TouchableOpacity
+                    key={difficulty}
+                    style={{
+                      flex: 1,
+                      backgroundColor:
+                        form.difficulty === difficulty ? colors.primary : colors.surface,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      alignItems: "center",
+                    }}
+                    onPress={() => setForm((current) => ({ ...current, difficulty }))}
+                  >
+                    <Text
+                      style={{
+                        color: form.difficulty === difficulty ? "white" : colors.text,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {difficulty === "beginner"
+                        ? "Iniciante"
+                        : difficulty === "intermediate"
+                          ? "Intermédio"
+                          : "Avançado"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+                onPress={handleCreateWorkout}
+              >
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                  Guardar treino
+                </Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          </LinearGradient>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
+}
+
+function workoutInputStyle(colors: ReturnType<typeof useTheme>["colors"]) {
+  return {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    color: colors.text,
+    marginBottom: 16,
+  } as const;
 }

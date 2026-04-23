@@ -1,11 +1,12 @@
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import CoachDashboard from "@/components/CoachDashboard";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Picker } from "@react-native-picker/picker";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -17,1434 +18,507 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CoachDashboard from "@/components/CoachDashboard";
 
-// Heat map component
-const ActivityHeatmap = ({
-  workoutLogs,
-  events,
-}: {
-  workoutLogs: any[];
-  events: any[];
-}) => {
-  const { colors } = useTheme();
-  const { t } = useTranslation();
+type EventType = "game" | "training" | "meeting" | "other";
 
-  // Generate last month of data
-  const generateHeatmapData = () => {
-    const today = new Date();
-    const data = [];
-    const activityMap = new Map<string, number>();
-
-    // Count activities per day from workout logs
-    workoutLogs.forEach((log) => {
-      const date = new Date(log.completed_at).toISOString().split("T")[0];
-      activityMap.set(date, (activityMap.get(date) || 0) + 1);
-    });
-
-    // Count events per day
-    events.forEach((event) => {
-      if (new Date(event.date) <= today) {
-        activityMap.set(event.date, (activityMap.get(event.date) || 0) + 1);
-      }
-    });
-
-    // Generate last month of days
-    for (let i = 122; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      const count = activityMap.get(dateStr) || 0;
-      data.push({
-        date: dateStr,
-        count,
-        day: date.getDay(),
-        month: date.getMonth(),
-        year: date.getFullYear(),
-      });
-    }
-
-    return data;
-  };
-
-  const heatmapData = generateHeatmapData();
-
-  const getIntensityColor = (count: number) => {
-    if (count === 0) return colors.surface;
-    if (count === 1) return colors.primary + "40"; // Light
-    if (count === 2) return colors.primary + "80"; // Medium
-    return colors.primary; // High
-  };
-
-  const weeks: any[][] = [];
-  let currentWeek: any[] = [];
-  heatmapData.forEach((day, index) => {
-    currentWeek.push(day);
-    if (day.day === 6 || index === heatmapData.length - 1) {
-      weeks.push(currentWeek);
-      currentWeek = [];
-    }
-  });
-
-  return (
-    <View style={{ marginBottom: 24 }}>
-      <Text
-        style={{
-          fontSize: 20,
-          fontWeight: "bold",
-          color: colors.text,
-          marginBottom: 16,
-        }}
-      >
-        {t("dashboard.activityHeatmap")}
-      </Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-        {weeks.map((week, weekIndex) => (
-          <View key={weekIndex} style={{ marginRight: 2 }}>
-            {week.map((day) => (
-              <TouchableOpacity
-                key={day.date}
-                style={{
-                  width: 16,
-                  height: 16,
-                  backgroundColor: getIntensityColor(day.count),
-                  margin: 1,
-                  borderRadius: 2,
-                }}
-                onPress={() => {
-                  if (day.count > 0) {
-                    Alert.alert(
-                      new Date(day.date).toLocaleDateString(),
-                      `${day.count} ${t("dashboard.totalActivities").toLowerCase()}`,
-                    );
-                  }
-                }}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginTop: 8,
-        }}
-      >
-        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-          {t("dashboard.noActivity")}
-        </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-          {t("dashboard.highActivity")}
-        </Text>
-      </View>
-    </View>
-  );
+type EventFormState = {
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  type: EventType;
+  location: string;
+  notes: string;
 };
 
-// Event Modal Component
-const EventModal = ({
+const emptyEventForm: EventFormState = {
+  title: "",
+  date: "",
+  start_time: "",
+  end_time: "",
+  type: "training",
+  location: "",
+  notes: "",
+};
+
+function EventModal({
   visible,
+  event,
   onClose,
   onSave,
   onDelete,
-  event,
-  initialDate,
-  initialTime,
 }: {
   visible: boolean;
-  onClose: () => void;
-  onSave: (eventData: any) => void;
-  onDelete?: (eventId: string) => void;
   event?: any;
-  initialDate?: string;
-  initialTime?: string;
-}) => {
+  onClose: () => void;
+  onSave: (form: EventFormState) => void;
+  onDelete?: () => void;
+}) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
-
-  const [formData, setFormData] = useState({
-    title: event?.title || "",
-    date: event?.date || initialDate || new Date().toISOString().split("T")[0],
-    start_time: event?.start_time || initialTime || "",
-    end_time: event?.end_time || "",
-    is_all_day: event?.is_all_day || false,
-    color: event?.color || "",
-    type: event?.type || "training",
-    notes: event?.notes || "",
-    location: event?.location || "",
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<EventFormState>(emptyEventForm);
 
   useEffect(() => {
-    if (visible) {
-      setFormData({
-        title: event?.title || "",
-        date:
-          event?.date || initialDate || new Date().toISOString().split("T")[0],
-        start_time: event?.start_time || initialTime || "",
-        end_time: event?.end_time || "",
-        is_all_day: event?.is_all_day || false,
-        color: event?.color || "",
-        type: event?.type || "training",
-        notes: event?.notes || "",
-        location: event?.location || "",
-      });
-      setErrors({});
-    }
-  }, [visible, event, initialDate, initialTime]);
-
-  const colorOptions = [
-    { label: "Default", value: "" },
-    { label: "Blue", value: "#3B82F6" },
-    { label: "Green", value: "#10B981" },
-    { label: "Red", value: "#EF4444" },
-    { label: "Yellow", value: "#F59E0B" },
-    { label: "Purple", value: "#8B5CF6" },
-    { label: "Pink", value: "#EC4899" },
-  ];
-
-  const eventTypes = [
-    { label: "Training", value: "training" },
-    { label: "Game", value: "game" },
-    { label: "Medical", value: "medical" },
-  ];
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = "Title is required";
-    }
-
-    if (!formData.date) {
-      newErrors.date = "Date is required";
-    }
-
-    if (!formData.is_all_day) {
-      if (!formData.start_time) {
-        newErrors.start_time = "Start time is required for timed events";
-      }
-      if (!formData.end_time) {
-        newErrors.end_time = "End time is required for timed events";
-      }
-      if (
-        formData.start_time &&
-        formData.end_time &&
-        formData.start_time >= formData.end_time
-      ) {
-        newErrors.end_time = "End time must be after start time";
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSave = () => {
-    if (validateForm()) {
-      onSave(formData);
-      onClose();
-    }
-  };
-
-  const handleDelete = () => {
-    if (event && onDelete) {
-      Alert.alert(
-        "Delete Event",
-        "Are you sure you want to delete this event?",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => onDelete(event._id),
-          },
-        ],
-      );
-    }
-  };
+    if (!visible) return;
+    setForm({
+      title: event?.title || "",
+      date: event?.date || "",
+      start_time: event?.start_time || "",
+      end_time: event?.end_time || "",
+      type: event?.type || "training",
+      location: event?.location || "",
+      notes: event?.notes || "",
+    });
+  }, [event, visible]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.5)",
+          backgroundColor: "rgba(0,0,0,0.45)",
           justifyContent: "center",
+          padding: 20,
         }}
       >
-        <View
-          style={{
-            backgroundColor: colors.bg,
-            margin: 20,
-            borderRadius: 12,
-            maxHeight: "80%",
-          }}
-        >
-          <ScrollView style={{ padding: 20 }}>
-            <Text
-              style={{
-                fontSize: 20,
-                fontWeight: "bold",
-                color: colors.text,
-                marginBottom: 20,
-              }}
-            >
-              {event ? "Edit Event" : "Create Event"}
-            </Text>
-
-            {/* Title */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>Title *</Text>
+        <View style={{ backgroundColor: colors.bg, borderRadius: 18, padding: 20 }}>
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: "700", marginBottom: 20 }}>
+            {event ? "Editar evento" : "Novo evento"}
+          </Text>
+          <TextInput
+            value={form.title}
+            onChangeText={(text) => setForm((current) => ({ ...current, title: text }))}
+            placeholder="Título"
+            placeholderTextColor={colors.textMuted}
+            style={eventInput(colors)}
+          />
+          <TextInput
+            value={form.date}
+            onChangeText={(text) => setForm((current) => ({ ...current, date: text }))}
+            placeholder="Data (YYYY-MM-DD)"
+            placeholderTextColor={colors.textMuted}
+            style={eventInput(colors)}
+          />
+          <View style={{ flexDirection: "row", gap: 10 }}>
             <TextInput
-              style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 4,
-              }}
-              value={formData.title}
-              onChangeText={(text) => setFormData({ ...formData, title: text })}
-              placeholder="Event title"
+              value={form.start_time}
+              onChangeText={(text) => setForm((current) => ({ ...current, start_time: text }))}
+              placeholder="Início HH:MM"
               placeholderTextColor={colors.textMuted}
+              style={[eventInput(colors), { flex: 1 }]}
             />
-            {errors.title && (
-              <Text
-                style={{ color: "#EF4444", fontSize: 12, marginBottom: 16 }}
-              >
-                {errors.title}
-              </Text>
-            )}
-
-            {/* Date */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>Date *</Text>
             <TextInput
-              style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 4,
-              }}
-              value={formData.date}
-              onChangeText={(text) => setFormData({ ...formData, date: text })}
-              placeholder="YYYY-MM-DD"
+              value={form.end_time}
+              onChangeText={(text) => setForm((current) => ({ ...current, end_time: text }))}
+              placeholder="Fim HH:MM"
               placeholderTextColor={colors.textMuted}
+              style={[eventInput(colors), { flex: 1 }]}
             />
-            {errors.date && (
-              <Text
-                style={{ color: "#EF4444", fontSize: 12, marginBottom: 16 }}
-              >
-                {errors.date}
-              </Text>
-            )}
-
-            {/* All Day Toggle */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <TouchableOpacity
-                style={{
-                  width: 50,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: formData.is_all_day
-                    ? colors.primary
-                    : colors.surface,
-                  justifyContent: "center",
-                  paddingHorizontal: 2,
-                }}
-                onPress={() =>
-                  setFormData({ ...formData, is_all_day: !formData.is_all_day })
-                }
-              >
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    backgroundColor: "white",
-                    transform: [{ translateX: formData.is_all_day ? 26 : 0 }],
-                  }}
-                />
-              </TouchableOpacity>
-              <Text style={{ color: colors.text, marginLeft: 12 }}>
-                All Day Event
-              </Text>
-            </View>
-
-            {/* Time Fields */}
-            {!formData.is_all_day && (
-              <>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ color: colors.text, marginBottom: 8 }}>
-                      Start Time *
-                    </Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: colors.surface,
-                        color: colors.text,
-                        padding: 12,
-                        borderRadius: 8,
-                        marginBottom: 4,
-                      }}
-                      value={formData.start_time}
-                      onChangeText={(text) =>
-                        setFormData({ ...formData, start_time: text })
-                      }
-                      placeholder="HH:MM"
-                      placeholderTextColor={colors.textMuted}
-                    />
-                    {errors.start_time && (
-                      <Text style={{ color: "#EF4444", fontSize: 12 }}>
-                        {errors.start_time}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={{ color: colors.text, marginBottom: 8 }}>
-                      End Time *
-                    </Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: colors.surface,
-                        color: colors.text,
-                        padding: 12,
-                        borderRadius: 8,
-                        marginBottom: 4,
-                      }}
-                      value={formData.end_time}
-                      onChangeText={(text) =>
-                        setFormData({ ...formData, end_time: text })
-                      }
-                      placeholder="HH:MM"
-                      placeholderTextColor={colors.textMuted}
-                    />
-                    {errors.end_time && (
-                      <Text style={{ color: "#EF4444", fontSize: 12 }}>
-                        {errors.end_time}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </>
-            )}
-
-            {/* Event Type */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>
-              Event Type
-            </Text>
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-            >
-              <Picker
-                selectedValue={formData.type}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, type: value })
-                }
-                style={{ color: colors.text }}
-              >
-                {eventTypes.map((type) => (
-                  <Picker.Item
-                    key={type.value}
-                    label={type.label}
-                    value={type.value}
-                  />
-                ))}
-              </Picker>
-            </View>
-
-            {/* Color */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>Color</Text>
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-            >
-              <Picker
-                selectedValue={formData.color}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, color: value })
-                }
-                style={{ color: colors.text }}
-              >
-                {colorOptions.map((color) => (
-                  <Picker.Item
-                    key={color.value}
-                    label={color.label}
-                    value={color.value}
-                  />
-                ))}
-              </Picker>
-            </View>
-
-            {/* Location */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>
-              Location
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-              value={formData.location}
-              onChangeText={(text) =>
-                setFormData({ ...formData, location: text })
+          </View>
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              marginBottom: 16,
+              overflow: "hidden",
+            }}
+          >
+            <Picker
+              selectedValue={form.type}
+              onValueChange={(value) =>
+                setForm((current) => ({ ...current, type: value as EventType }))
               }
-              placeholder="Event location"
-              placeholderTextColor={colors.textMuted}
-            />
-
-            {/* Notes */}
-            <Text style={{ color: colors.text, marginBottom: 8 }}>Notes</Text>
-            <TextInput
-              style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 20,
-                height: 80,
-                textAlignVertical: "top",
-              }}
-              value={formData.notes}
-              onChangeText={(text) => setFormData({ ...formData, notes: text })}
-              placeholder="Additional notes"
-              placeholderTextColor={colors.textMuted}
-              multiline
-            />
-
-            {/* Buttons */}
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
+              style={{ color: colors.text }}
             >
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                  padding: 12,
-                  borderRadius: 8,
-                  marginRight: 8,
-                  alignItems: "center",
-                }}
-                onPress={onClose}
-              >
-                <Text style={{ color: colors.text, fontWeight: "bold" }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.primary,
-                  padding: 12,
-                  borderRadius: 8,
-                  marginLeft: 8,
-                  alignItems: "center",
-                }}
-                onPress={handleSave}
-              >
-                <Text style={{ color: "white", fontWeight: "bold" }}>Save</Text>
-              </TouchableOpacity>
-            </View>
+              <Picker.Item label="Treino" value="training" />
+              <Picker.Item label="Jogo" value="game" />
+              <Picker.Item label="Reunião" value="meeting" />
+              <Picker.Item label="Outro" value="other" />
+            </Picker>
+          </View>
+          <TextInput
+            value={form.location}
+            onChangeText={(text) => setForm((current) => ({ ...current, location: text }))}
+            placeholder="Local"
+            placeholderTextColor={colors.textMuted}
+            style={eventInput(colors)}
+          />
+          <TextInput
+            value={form.notes}
+            onChangeText={(text) => setForm((current) => ({ ...current, notes: text }))}
+            placeholder="Notas"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={[eventInput(colors), { height: 100, textAlignVertical: "top" }]}
+          />
 
-            {event && onDelete && (
-              <TouchableOpacity
-                style={{
-                  backgroundColor: "#EF4444",
-                  padding: 12,
-                  borderRadius: 8,
-                  marginTop: 12,
-                  alignItems: "center",
-                }}
-                onPress={handleDelete}
-              >
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  Delete Event
-                </Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: colors.surface,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+              onPress={onClose}
+            >
+              <Text style={{ color: colors.text, fontWeight: "700" }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: colors.primary,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+              onPress={() => onSave(form)}
+            >
+              <Text style={{ color: "white", fontWeight: "700" }}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+
+          {onDelete ? (
+            <TouchableOpacity
+              style={{
+                marginTop: 12,
+                backgroundColor: colors.danger,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+              onPress={onDelete}
+            >
+              <Text style={{ color: "white", fontWeight: "700" }}>Eliminar</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </Modal>
   );
-};
+}
 
-// Comprehensive calendar component
-const Calendar = ({
+function ActivityHeatmap({
+  workoutLogs,
   events,
-  onAddEvent,
-  onEditEvent,
-  onTimeSlotPress,
 }: {
-  events: any[];
-  onAddEvent: () => void;
-  onEditEvent: (event: any) => void;
-  onTimeSlotPress: (date: string, time: string) => void;
-}) => {
+  workoutLogs: { completedDate: number }[];
+  events: { date: string }[];
+}) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
+  const today = new Date();
+  const activityMap = new Map<string, number>();
 
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  workoutLogs.forEach((log) => {
+    const day = new Date(log.completedDate).toISOString().split("T")[0];
+    activityMap.set(day, (activityMap.get(day) || 0) + 1);
+  });
 
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  const getEventColor = (event: any) => {
-    if (event.color) return event.color;
-    switch (event.type) {
-      case "training":
-        return "#3B82F6"; // blue
-      case "game":
-        return "#10B981"; // green
-      case "medical":
-        return "#EF4444"; // red
-      default:
-        return colors.primary;
+  events.forEach((event) => {
+    if (new Date(event.date) <= today) {
+      activityMap.set(event.date, (activityMap.get(event.date) || 0) + 1);
     }
-  };
+  });
 
-  const getEventsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
-    return events.filter((event) => event.date === dateStr);
-  };
+  const days = Array.from({ length: 35 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (34 - index));
+    const key = date.toISOString().split("T")[0];
+    return { key, count: activityMap.get(key) || 0 };
+  });
 
-  const navigateMonth = (direction: number) => {
-    setCurrentDate(
-      new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + direction,
-        1,
-      ),
-    );
-  };
-
-  const navigateWeek = (direction: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + direction * 7);
-    setCurrentDate(newDate);
-  };
-
-  const navigateDay = (direction: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + direction);
-    setCurrentDate(newDate);
-  };
-
-  const switchToDayView = (date: Date) => {
-    setCurrentDate(date);
-    setViewMode("day");
-  };
-
-  const renderMonthView = () => {
-    const getDaysInMonth = (date: Date) => {
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const days = [];
-
-      // Add nulls for days before the first day of the month
-      for (let i = 0; i < firstDay.getDay(); i++) {
-        days.push(null);
-      }
-
-      // Add all days of the month
-      for (let i = 1; i <= lastDay.getDate(); i++) {
-        days.push(new Date(year, month, i));
-      }
-
-      // Pad the end with nulls to complete the last week
-      const totalDays = days.length;
-      const remainder = totalDays % 7;
-      if (remainder !== 0) {
-        const padding = 7 - remainder;
-        for (let i = 0; i < padding; i++) {
-          days.push(null);
-        }
-      }
-
-      return days;
-    };
-
-    const monthDays = getDaysInMonth(currentDate);
-
-    // Group days into weeks
-    const weeks = [];
-    for (let i = 0; i < monthDays.length; i += 7) {
-      weeks.push(monthDays.slice(i, i + 7));
-    }
-
-    return (
-      <View>
-        {/* Day headers */}
-        <View style={{ flexDirection: "row", marginBottom: 8 }}>
-          {dayNames.map((day) => (
-            <View key={day} style={{ flex: 1, alignItems: "center" }}>
-              <Text
-                style={{
-                  color: colors.textMuted,
-                  fontSize: 12,
-                  fontWeight: "bold",
-                }}
-              >
-                {day}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Calendar grid */}
-        {weeks.map((week, weekIndex) => (
-          <View key={weekIndex} style={{ flexDirection: "row" }}>
-            {week.map((date, dayIndex) => (
-              <TouchableOpacity
-                key={dayIndex}
-                style={{
-                  flex: 1,
-                  aspectRatio: 1,
-                  padding: 4,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onPress={() => date && switchToDayView(date)}
-              >
-                {date && (
-                  <View style={{ alignItems: "center" }}>
-                    <Text
-                      style={{
-                        color: colors.text,
-                        fontSize: 14,
-                        fontWeight: "bold",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {date.getDate()}
-                    </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                      {getEventsForDate(date)
-                        .slice(0, 3)
-                        .map((event, i) => (
-                          <View
-                            key={i}
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: 3,
-                              backgroundColor: getEventColor(event),
-                              margin: 1,
-                            }}
-                          />
-                        ))}
-                      {getEventsForDate(date).length > 3 && (
-                        <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-                          ...
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </View>
-    );
-  };
-
-  const renderWeekView = () => {
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-
-    const weekDays = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      weekDays.push(day);
-    }
-
-    return (
-      <View>
-        <View style={{ flexDirection: "row", marginBottom: 8 }}>
-          {weekDays.map((day, index) => (
-            <TouchableOpacity
-              key={index}
-              style={{ flex: 1, alignItems: "center", padding: 8 }}
-              onPress={() => switchToDayView(day)}
-            >
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                {dayNames[day.getDay()]}
-              </Text>
-              <Text
-                style={{ color: colors.text, fontSize: 16, fontWeight: "bold" }}
-              >
-                {day.getDate()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <ScrollView style={{ height: 300 }}>
-          {weekDays.map((day, index) => (
-            <View key={index} style={{ flexDirection: "row", marginBottom: 8 }}>
-              <View style={{ width: 60, alignItems: "center" }}>
-                <Text style={{ color: colors.text, fontSize: 12 }}>
-                  {day.toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                {getEventsForDate(day).map((event, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={{
-                      backgroundColor: getEventColor(event),
-                      padding: 8,
-                      borderRadius: 4,
-                      marginBottom: 4,
-                    }}
-                    onPress={() => onEditEvent(event)}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 12,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {event.title}
-                    </Text>
-                    <Text style={{ color: "white", fontSize: 10 }}>
-                      {event.start_time && event.end_time
-                        ? `${event.start_time} - ${event.end_time}`
-                        : "All day"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate);
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <ScrollView style={{ height: 400 }}>
-        <Text
-          style={{
-            color: colors.text,
-            fontSize: 18,
-            fontWeight: "bold",
-            marginBottom: 16,
-          }}
-        >
-          {currentDate.toLocaleDateString(undefined, {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </Text>
-        {hours.map((hour) => (
-          <View
-            key={hour}
-            style={{
-              flexDirection: "row",
-              height: 60,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.surface,
-            }}
-          >
-            <View
-              style={{ width: 60, justifyContent: "flex-start", paddingTop: 4 }}
-            >
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                {hour.toString().padStart(2, "0")}:00
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={{ flex: 1, position: "relative" }}
-              onPress={() =>
-                onTimeSlotPress(
-                  currentDate.toISOString().split("T")[0],
-                  `${hour.toString().padStart(2, "0")}:00`,
-                )
-              }
-            >
-              {dayEvents
-                .filter((event) => !event.is_all_day && event.start_time)
-                .filter((event) => {
-                  const startHour = parseInt(event.start_time.split(":")[0]);
-                  return startHour === hour;
-                })
-                .map((event, i) => {
-                  const startMinutes =
-                    parseInt(event.start_time.split(":")[1]) || 0;
-                  const endMinutes =
-                    parseInt(event.end_time.split(":")[1]) || 0;
-                  const startHour = parseInt(event.start_time.split(":")[0]);
-                  const endHour = parseInt(event.end_time.split(":")[0]);
-                  const duration =
-                    endHour - startHour + (endMinutes - startMinutes) / 60;
-                  const top = (startMinutes / 60) * 60;
-                  const height = Math.max(duration * 60, 30);
-
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={{
-                        position: "absolute",
-                        top,
-                        left: 4,
-                        right: 4,
-                        height,
-                        backgroundColor: getEventColor(event),
-                        borderRadius: 4,
-                        padding: 4,
-                        justifyContent: "center",
-                      }}
-                      onPress={() => onEditEvent(event)}
-                    >
-                      <Text
-                        style={{
-                          color: "white",
-                          fontSize: 12,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {event.title}
-                      </Text>
-                      <Text style={{ color: "white", fontSize: 10 }}>
-                        {event.start_time} - {event.end_time}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-            </TouchableOpacity>
-          </View>
-        ))}
-        {/* All-day events */}
-        {dayEvents.filter((event) => event.is_all_day).length > 0 && (
-          <View style={{ marginTop: 16 }}>
-            <Text
-              style={{
-                color: colors.text,
-                fontSize: 14,
-                fontWeight: "bold",
-                marginBottom: 8,
-              }}
-            >
-              All Day
-            </Text>
-            {dayEvents
-              .filter((event) => event.is_all_day)
-              .map((event, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={{
-                    backgroundColor: getEventColor(event),
-                    padding: 8,
-                    borderRadius: 4,
-                    marginBottom: 4,
-                  }}
-                  onPress={() => onEditEvent(event)}
-                >
-                  <Text
-                    style={{ color: "white", fontSize: 12, fontWeight: "bold" }}
-                  >
-                    {event.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-          </View>
-        )}
-      </ScrollView>
-    );
-  };
-
-  const getNavigationTitle = () => {
-    switch (viewMode) {
-      case "month":
-        return `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
-      case "week": {
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        return `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
-      }
-      case "day":
-        return currentDate.toLocaleDateString(undefined, {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-    }
-  };
-
-  const navigate = (direction: number) => {
-    switch (viewMode) {
-      case "month":
-        navigateMonth(direction);
-        break;
-      case "week":
-        navigateWeek(direction);
-        break;
-      case "day":
-        navigateDay(direction);
-        break;
-    }
+  const getColor = (count: number) => {
+    if (count === 0) return colors.surface;
+    if (count === 1) return `${colors.primary}55`;
+    if (count === 2) return `${colors.primary}99`;
+    return colors.primary;
   };
 
   return (
-    <View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.text }}>
-          {t("dashboard.calendar")}
-        </Text>
-        <TouchableOpacity
-          style={{
-            backgroundColor: colors.primary,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8,
-          }}
-          onPress={onAddEvent}
-        >
-          <Text style={{ color: "white", fontWeight: "bold" }}>
-            + {t("dashboard.addEvent")}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* View mode buttons */}
-      <View style={{ flexDirection: "row", marginBottom: 16 }}>
-        {(["month", "week", "day"] as const).map((mode) => (
-          <TouchableOpacity
-            key={mode}
+    <View style={{ marginBottom: 24 }}>
+      <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: 12 }}>
+        Atividade recente
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        {days.map((day) => (
+          <View
+            key={day.key}
             style={{
-              flex: 1,
-              padding: 8,
-              alignItems: "center",
-              backgroundColor:
-                viewMode === mode ? colors.primary : colors.surface,
+              width: 18,
+              height: 18,
               borderRadius: 4,
-              marginHorizontal: 2,
+              backgroundColor: getColor(day.count),
             }}
-            onPress={() => setViewMode(mode)}
-          >
-            <Text
-              style={{
-                color: viewMode === mode ? "white" : colors.text,
-                fontSize: 12,
-                fontWeight: "bold",
-                textTransform: "capitalize",
-              }}
-            >
-              {mode}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
-
-      {/* Navigation */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <TouchableOpacity onPress={() => navigate(-1)}>
-          <Text style={{ color: colors.primary, fontSize: 18 }}>‹</Text>
-        </TouchableOpacity>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "bold" }}>
-          {getNavigationTitle()}
-        </Text>
-        <TouchableOpacity onPress={() => navigate(1)}>
-          <Text style={{ color: colors.primary, fontSize: 18 }}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Render view */}
-      {viewMode === "month" && renderMonthView()}
-      {viewMode === "week" && renderWeekView()}
-      {viewMode === "day" && renderDayView()}
     </View>
   );
-};
+}
 
 export default function Dashboard() {
   const { colors } = useTheme();
-  const { t } = useTranslation();
   const { user } = useAuth();
-  const convexUser = useQuery(api.users.getCurrentUser);
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
+  );
+  const workoutLogsQuery = useQuery(
+    api.workouts.getWorkoutLogs,
+    convexUser ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const eventsQuery = useQuery(
+    api.events.getEvents,
+    convexUser ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const workoutLogs = workoutLogsQuery ?? [];
+  const events = eventsQuery ?? [];
+  const playerStats =
+    useQuery(
+      api.users.getPlayerStats,
+      convexUser ? { sessionUserId: convexUser._id } : "skip",
+    ) || {
+      gamesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      points: 0,
+      assists: 0,
+      rebounds: 0,
+    };
+  const coachDashboard =
+    useQuery(
+      api.users.getCoachDashboard,
+      convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
+    ) || {
+      totalAthletes: 0,
+      recentWorkouts: 0,
+      upcomingEvents: 0,
+      athletes: [],
+    };
+  const teamAthletes =
+    useQuery(
+      api.teams.getTeamAthletes,
+      convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
+    ) || [];
 
-  const workoutLogs = useQuery(api.workouts.getWorkoutLogs as any, convexUser ? {} : "skip") || [];
-  const events = useQuery(api.events.getEvents as any, convexUser ? {} : "skip") || [];
-  const playerStats: any = useQuery(api.users.getPlayerStats as any, convexUser ? {} : "skip") || {
-    totalWorkouts: 0,
-    totalGames: 0,
-    weeklyFrequency: 0,
-    monthlyFrequency: 0,
-    currentStreak: 0,
-    bestStreak: 0,
-  };
-  const coachDashboard = useQuery(api.users.getCoachDashboard as any, convexUser?.role === "COACH" ? {} : "skip") || {
-    totalAthletes: 0,
-    activeAthletes: 0,
-    inactiveAthletes: 0,
-    averageWeeklyFrequency: 0,
-    upcomingTrainings: 0,
-    upcomingGames: 0,
-    lowActivityAlerts: 0,
-  };
-  const teamAthletes = useQuery(api.users.getTeamAthletes as any, convexUser?.role === "COACH" ? {} : "skip") || [];
-  const createEventMutation = useMutation(api.events.createEvent as any);
-  const updateEventMutation = useMutation(api.events.updateEvent as any);
-  const deleteEventMutation = useMutation(api.events.deleteEvent as any);
+  const createEvent = useMutation(api.events.createEvent);
+  const updateEvent = useMutation(api.events.updateEvent);
+  const deleteEvent = useMutation(api.events.deleteEvent);
 
-  const [showEventModal, setShowEventModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
-  const [modalInitialDate, setModalInitialDate] = useState<string>("");
-  const [modalInitialTime, setModalInitialTime] = useState<string>("");
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisWeek = new Date(now);
-    thisWeek.setDate(now.getDate() - now.getDay());
-
-    const totalActivities =
-      workoutLogs.length + events.filter((e: any) => new Date(e.date) <= now).length;
-
-    const monthActivities =
-      workoutLogs.filter((log: any) => new Date(log.completedDate) >= thisMonth)
-        .length +
-      events.filter(
-        (event: any) =>
-          new Date(event.date) >= thisMonth && new Date(event.date) <= now,
-      ).length;
-
-    const weekActivities =
-      workoutLogs.filter((log: any) => new Date(log.completedDate) >= thisWeek)
-        .length +
-      events.filter(
-        (event: any) =>
-          new Date(event.date) >= thisWeek && new Date(event.date) <= now,
-      ).length;
-
-    // Calculate streak (simplified)
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(today.getDate() - i);
-      const dateStr = checkDate.toISOString().split("T")[0];
-
-      const hasActivity =
-        workoutLogs.some(
-          (log: any) =>
-            new Date(log.completedDate).toISOString().split("T")[0] === dateStr,
-        ) || events.some((event: any) => event.date === dateStr);
-
-      if (hasActivity) {
-        streak++;
-      } else if (i > 0) {
-        break;
-      }
-    }
-
-    return { totalActivities, monthActivities, weekActivities, streak };
-  }, [workoutLogs, events]);
-
-  const handleAddEvent = () => {
-    setEditingEvent(null);
-    setModalInitialDate("");
-    setModalInitialTime("");
-    setShowEventModal(true);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const summary = {
+    totalActivities: workoutLogs.length + events.length,
+    monthActivities:
+      workoutLogs.filter((log) => log.completedDate >= monthStart).length +
+      events.filter((event) => new Date(event.date).getTime() >= monthStart).length,
+    weekActivities:
+      workoutLogs.filter((log) => log.completedDate >= weekStart.getTime()).length +
+      events.filter((event) => new Date(event.date).getTime() >= weekStart.getTime()).length,
   };
 
-  const handleEditEvent = (event: any) => {
-    setEditingEvent(event);
-    setModalInitialDate("");
-    setModalInitialTime("");
-    setShowEventModal(true);
-  };
-
-  const handleTimeSlotPress = (date: string, time: string) => {
-    setEditingEvent(null);
-    setModalInitialDate(date);
-    setModalInitialTime(time);
-    setShowEventModal(true);
-  };
-
-  const handleSaveEvent = async (eventData: any) => {
-    try {
-      if (editingEvent) {
-        await updateEventMutation({ id: editingEvent._id, ...eventData });
-        Alert.alert("Success", "Event updated!");
-      } else {
-        await createEventMutation(eventData);
-        Alert.alert("Success", "Event created!");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to save event");
-    }
-  };
-
-  const handleDeleteEvent = async (eventId: any) => {
-    try {
-      await deleteEventMutation({ id: eventId });
-      setShowEventModal(false);
-      Alert.alert("Success", "Event deleted!");
-    } catch (error) {
-      Alert.alert("Error", "Failed to delete event");
-    }
-  };
-
-  // Show loading or redirect if no user
   if (!convexUser) {
     return null;
   }
 
-  // Coach Dashboard
-  if (convexUser?.role === "COACH") {
+  if (convexUser.role === "COACH") {
     return (
       <CoachDashboard
         coachDashboard={coachDashboard}
         teamAthletes={teamAthletes}
         colors={colors}
-        t={t}
       />
     );
   }
 
-  // Player Dashboard (existing code)
+  const handleSaveEvent = async (form: EventFormState) => {
+    if (!convexUser) return;
+    if (!form.title.trim() || !form.date || !form.start_time || !form.end_time) {
+      Alert.alert("Erro", "Preenche título, data e horário.");
+      return;
+    }
+
+    const payload = {
+      sessionUserId: convexUser._id,
+      title: form.title.trim(),
+      description: form.notes.trim() || undefined,
+      date: form.date,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      location: form.location.trim() || undefined,
+      type: form.type,
+      notes: form.notes.trim() || undefined,
+    };
+
+    try {
+      if (editingEvent) {
+        await updateEvent({ id: editingEvent._id, ...payload });
+      } else {
+        await createEvent(payload);
+      }
+      setShowModal(false);
+      setEditingEvent(null);
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao guardar evento.");
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!convexUser || !editingEvent) return;
+    try {
+      await deleteEvent({
+        sessionUserId: convexUser._id,
+        id: editingEvent._id,
+      });
+      setShowModal(false);
+      setEditingEvent(null);
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao eliminar evento.");
+    }
+  };
+
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1, padding: 20 }}>
-          {/* Header */}
           <View style={{ marginBottom: 24 }}>
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "bold",
-                color: colors.text,
-                marginBottom: 4,
-              }}
-            >
-              {t("dashboard.title")}
+            <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+              Dashboard
             </Text>
-            <Text style={{ color: colors.textMuted }}>
-              {t("dashboard.subtitle")}
+            <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+              Resumo da tua atividade e próximos eventos.
             </Text>
           </View>
 
-          {/* Stats Cards - First Row */}
-          <View style={{ flexDirection: "row", marginBottom: 16 }}>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginRight: 8,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{ color: colors.primary, fontSize: 24, fontWeight: "bold" }}
-              >
-                {playerStats.totalWorkouts}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                Treinos
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 4,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{ color: colors.success, fontSize: 24, fontWeight: "bold" }}
-              >
-                {playerStats.totalGames}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                Jogos
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 4,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{ color: colors.warning, fontSize: 24, fontWeight: "bold" }}
-              >
-                {playerStats.weeklyFrequency}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                / Semana
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginLeft: 8,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{ color: colors.text, fontSize: 24, fontWeight: "bold" }}
-              >
-                {playerStats.monthlyFrequency}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                / Mês
-              </Text>
-            </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+            <StatCard label="Atividades" value={summary.totalActivities} color={colors.primary} colors={colors} />
+            <StatCard label="Esta semana" value={summary.weekActivities} color={colors.warning} colors={colors} />
+            <StatCard label="Este mês" value={summary.monthActivities} color={colors.success} colors={colors} />
           </View>
 
-          {/* Stats Cards - Second Row */}
-          <View style={{ flexDirection: "row", marginBottom: 24 }}>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginRight: 8,
-                alignItems: "center",
-                borderLeftWidth: 4,
-                borderLeftColor: colors.primary,
-              }}
-            >
-              <Text
-                style={{ color: colors.text, fontSize: 20, fontWeight: "bold" }}
-              >
-                🔥 {playerStats.currentStreak}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                Streak Atual
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginLeft: 8,
-                alignItems: "center",
-                borderLeftWidth: 4,
-                borderLeftColor: colors.success,
-              }}
-            >
-              <Text
-                style={{ color: colors.text, fontSize: 20, fontWeight: "bold" }}
-              >
-                ⭐ {playerStats.bestStreak}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                Melhor Streak
-              </Text>
-            </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+            <StatCard label="Jogos" value={playerStats.gamesPlayed} color={colors.primary} colors={colors} />
+            <StatCard label="Vitórias" value={playerStats.wins} color={colors.success} colors={colors} />
+            <StatCard label="Pontos" value={playerStats.points} color={colors.warning} colors={colors} />
           </View>
 
-          {/* Heat Map */}
           <ActivityHeatmap workoutLogs={workoutLogs} events={events} />
 
-          {/* Calendar */}
-          <Calendar
-            events={events}
-            onAddEvent={handleAddEvent}
-            onEditEvent={handleEditEvent}
-            onTimeSlotPress={handleTimeSlotPress}
-          />
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 24,
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>
+                Eventos
+              </Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                }}
+                onPress={() => {
+                  setEditingEvent(null);
+                  setShowModal(true);
+                }}
+              >
+                <Text style={{ color: "white", fontWeight: "700" }}>+ Evento</Text>
+              </TouchableOpacity>
+            </View>
+
+            {events.length === 0 ? (
+              <Text style={{ color: colors.textMuted }}>
+                Ainda não tens eventos registados.
+              </Text>
+            ) : (
+              events.map((event) => (
+                <TouchableOpacity
+                  key={event._id}
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    paddingVertical: 12,
+                  }}
+                  onPress={() => {
+                    setEditingEvent(event);
+                    setShowModal(true);
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>{event.title}</Text>
+                  <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+                    {event.date} • {event.start_time} - {event.end_time}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, marginTop: 2 }}>
+                    {event.location || "Sem localização"} • {event.type}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
         </ScrollView>
 
-        {/* Event Modal */}
         <EventModal
-          visible={showEventModal}
-          onClose={() => setShowEventModal(false)}
-          onSave={handleSaveEvent}
-          onDelete={handleDeleteEvent}
+          visible={showModal}
           event={editingEvent}
-          initialDate={modalInitialDate}
-          initialTime={modalInitialTime}
+          onClose={() => {
+            setShowModal(false);
+            setEditingEvent(null);
+          }}
+          onSave={handleSaveEvent}
+          onDelete={editingEvent ? handleDeleteEvent : undefined}
         />
       </SafeAreaView>
     </LinearGradient>
   );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+  colors,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: "30%",
+        backgroundColor: colors.surface,
+        borderRadius: 16,
+        padding: 16,
+        alignItems: "center",
+      }}
+    >
+      <Text style={{ color, fontSize: 24, fontWeight: "700" }}>{value}</Text>
+      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>{label}</Text>
+    </View>
+  );
+}
+
+function eventInput(colors: ReturnType<typeof useTheme>["colors"]) {
+  return {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    color: colors.text,
+    marginBottom: 16,
+  } as const;
 }

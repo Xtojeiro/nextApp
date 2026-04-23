@@ -30,12 +30,18 @@ export default function Profile() {
   const generateUploadUrl = useMutation(api.users.generateUploadUrl as any);
   const updateAvatar = useMutation(api.users.updateAvatar as any);
   const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility as any);
-  const profileVisibility = useQuery(api.users.getProfileVisibility as any, {});
+  const profileVisibility = useQuery(
+    api.users.getProfileVisibility as any,
+    user ? { sessionUserId: user.id as any } : "skip",
+  );
   const deleteAccount = useMutation(api.users.deleteAccount as any);
   const achievements = useQuery(api.achievements.getByUserId as any, user ? { userId: user.id as any } : "skip");
   const allAchievements = useQuery(api.achievements.getAll as any) || [];
   const followersCount = useQuery(api.follows.getFollowersCount as any, user ? { userId: user.id as any } : "skip");
-  const followingCount = useQuery(api.follows.getFollowingCount as any, user ? { userId: user.id as any } : "skip");
+  const followingCount = useQuery(
+    api.follows.getFollowingCount as any,
+    user ? { sessionUserId: user.id as any, userId: user.id as any } : "skip",
+  );
 
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -89,7 +95,7 @@ export default function Profile() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteAccount();
+              await deleteAccount({ sessionUserId: user?.id as any });
               await logout();
               router.replace("/login");
             } catch (error) {
@@ -104,6 +110,7 @@ export default function Profile() {
   const handleEditProfile = async () => {
     try {
       await updateUser({
+        sessionUserId: user?.id as any,
         name: editName,
         bio: editBio,
       });
@@ -124,7 +131,7 @@ export default function Profile() {
     if (pickerResult.canceled) return;
     const uri = pickerResult.assets[0].uri;
     try {
-      const uploadUrl = await generateUploadUrl();
+      const uploadUrl = await generateUploadUrl({ sessionUserId: user?.id as any });
       const response = await fetch(uri);
       const blob = await response.blob();
       const formData = new FormData();
@@ -134,7 +141,7 @@ export default function Profile() {
         body: formData,
       });
       const { storageId } = await uploadResponse.json();
-      await updateAvatar({ storageId });
+      await updateAvatar({ sessionUserId: user?.id as any, storageId });
       Alert.alert("Success", "Profile picture updated!");
     } catch (error) {
       Alert.alert("Error", "Failed to update profile picture");
@@ -432,10 +439,12 @@ export default function Profile() {
               <TouchableOpacity
                 onPress={async () => {
                   try {
-                    const newVisibility = await toggleProfileVisibility();
+                    const newVisibility = await toggleProfileVisibility({
+                      sessionUserId: user?.id as any,
+                    });
                     Alert.alert(
                       "Sucesso",
-                      `Perfil agora está ${newVisibility ? "público" : "privado"}`
+                      `Perfil agora está ${newVisibility.is_public ? "público" : "privado"}`
                     );
                   } catch (error) {
                     Alert.alert("Erro", "Falha ao alterar visibilidade");
