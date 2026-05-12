@@ -57,10 +57,7 @@ const JogadorNavigator = () => {
       <Tabs.Screen
         name="index"
         options={{
-          title: t("tabs.feed"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="newspaper" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

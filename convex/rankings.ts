@@ -30,7 +30,7 @@ export const getRankingsByGoals = query({
       
       const existing = playerTotals.get(stat.playerId) || {
         userId: stat.playerId,
-        fullName: user.full_name,
+        fullName: user.full_name || user.name || user.email || "Atleta",
         avatar: user.avatar,
         position: undefined,
         gamesPlayed: 0,
@@ -81,7 +81,7 @@ export const getRankingsByAssists = query({
       
       const existing = playerTotals.get(stat.playerId) || {
         userId: stat.playerId,
-        fullName: user.full_name,
+        fullName: user.full_name || user.name || user.email || "Atleta",
         avatar: user.avatar,
         position: undefined,
         gamesPlayed: 0,
@@ -128,7 +128,7 @@ export const getRankingsByGamesPlayed = query({
       
       const existing = playerTotals.get(stat.playerId) || {
         userId: stat.playerId,
-        fullName: user.full_name,
+        fullName: user.full_name || user.name || user.email || "Atleta",
         avatar: user.avatar,
         position: undefined,
         gamesPlayed: 0,
@@ -175,7 +175,7 @@ export const getRankingsByPoints = query({
       
       const existing = playerTotals.get(stat.playerId) || {
         userId: stat.playerId,
-        fullName: user.full_name,
+        fullName: user.full_name || user.name || user.email || "Atleta",
         avatar: user.avatar,
         position: undefined,
         gamesPlayed: 0,
@@ -223,7 +223,7 @@ export const getRankingsByRebounds = query({
       
       const existing = playerTotals.get(stat.playerId) || {
         userId: stat.playerId,
-        fullName: user.full_name,
+        fullName: user.full_name || user.name || user.email || "Atleta",
         avatar: user.avatar,
         position: undefined,
         gamesPlayed: 0,

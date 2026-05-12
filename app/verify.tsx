@@ -14,7 +14,7 @@ export default function Verify() {
           Verificacao removida
         </Text>
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          O projeto ja nao usa Clerk. O acesso agora e feito diretamente com email e palavra-passe no Convex.
+          O acesso agora e feito diretamente com email e palavra-passe pelo Convex Auth.
         </Text>
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.primary }]}

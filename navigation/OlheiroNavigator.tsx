@@ -56,10 +56,7 @@ const OlheiroNavigator = () => {
       <Tabs.Screen
         name="(tabs)/index"
         options={{
-          title: t("tabs.feed"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="newspaper" color={color} size={size} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

@@ -1,10 +1,10 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/utils/apiClient";
+import type { Id } from "@/utils/apiTypes";
 import CoachDashboard from "@/components/CoachDashboard";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Picker } from "@react-native-picker/picker";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
@@ -271,8 +271,8 @@ export default function Dashboard() {
     api.events.getEvents,
     convexUser ? { sessionUserId: convexUser._id } : "skip",
   );
-  const workoutLogs = workoutLogsQuery ?? [];
-  const events = eventsQuery ?? [];
+  const workoutLogs = (workoutLogsQuery ?? []) as any[];
+  const events = (eventsQuery ?? []) as any[];
   const playerStats =
     useQuery(
       api.users.getPlayerStats,
@@ -299,7 +299,7 @@ export default function Dashboard() {
     useQuery(
       api.teams.getTeamAthletes,
       convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
-    ) || [];
+    ) || ([] as any[]);
 
   const createEvent = useMutation(api.events.createEvent);
   const updateEvent = useMutation(api.events.updateEvent);

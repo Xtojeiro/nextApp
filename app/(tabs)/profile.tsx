@@ -1,8 +1,8 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { Image } from "expo-image";
 import { launchImageLibraryAsync } from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,31 +22,58 @@ import {
 
 export default function Profile() {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
-  const { user, logout, isSignedIn } = useAuth();
+  const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
   const updateUser = useMutation(api.users.updateUser as any);
+  const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility as any);
+  const deleteAccount = useMutation(api.users.deleteAccount as any);
+  const followUser = useMutation(api.follows.followUser as any);
+  const unfollowUser = useMutation(api.follows.unfollowUser as any);
+  const sendMessage = useMutation(api.chat.sendMessage as any);
   const generateUploadUrl = useMutation(api.users.generateUploadUrl as any);
   const updateAvatar = useMutation(api.users.updateAvatar as any);
-  const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility as any);
+
   const profileVisibility = useQuery(
     api.users.getProfileVisibility as any,
     user ? { sessionUserId: user.id as any } : "skip",
   );
-  const deleteAccount = useMutation(api.users.deleteAccount as any);
-  const achievements = useQuery(api.achievements.getByUserId as any, user ? { userId: user.id as any } : "skip");
-  const allAchievements = useQuery(api.achievements.getAll as any) || [];
-  const followersCount = useQuery(api.follows.getFollowersCount as any, user ? { userId: user.id as any } : "skip");
+  const achievements = useQuery(
+    api.achievements.getByUserId as any,
+    user ? { userId: user.id as any } : "skip",
+  );
+  const followersCount = useQuery(
+    api.follows.getFollowersCount as any,
+    user ? { userId: user.id as any } : "skip",
+  );
   const followingCount = useQuery(
     api.follows.getFollowingCount as any,
     user ? { sessionUserId: user.id as any, userId: user.id as any } : "skip",
   );
+  const following = useQuery(
+    api.follows.getFollowing as any,
+    user ? { userId: user.id as any, limit: 200 } : "skip",
+  );
 
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [discoverModalVisible, setDiscoverModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.fullName || "");
-  const [editBio, setEditBio] = useState("");
+  const [editBio, setEditBio] = useState(user?.bio || "");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const searchResults = useQuery(
+    api.users.searchUsers,
+    searchQuery.trim() ? { query: searchQuery.trim(), limit: 30 } : "skip",
+  );
+
+  const followingIds = new Set(
+    (following || []).map((item: any) => item?.following_id || item?._id || item?.id),
+  );
+  const visibleSearchResults = (searchResults || []).filter(
+    (result: any) => (result._id || result.id) !== user?.id,
+  );
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -98,7 +125,7 @@ export default function Profile() {
               await deleteAccount({ sessionUserId: user?.id as any });
               await logout();
               router.replace("/login");
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to delete account");
             }
           },
@@ -116,7 +143,7 @@ export default function Profile() {
       });
       setEditModalVisible(false);
       Alert.alert("Success", "Profile updated");
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to update profile");
     }
   };
@@ -129,33 +156,68 @@ export default function Profile() {
       quality: 1,
     });
     if (pickerResult.canceled) return;
-    const uri = pickerResult.assets[0].uri;
+
     try {
+      const asset = pickerResult.assets[0];
       const uploadUrl = await generateUploadUrl({ sessionUserId: user?.id as any });
-      const response = await fetch(uri);
+      const response = await fetch(asset.uri);
       const blob = await response.blob();
-      const formData = new FormData();
-      formData.append("file", blob, "avatar.jpg");
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": blob.type || "image/jpeg" },
+        body: blob,
       });
+      if (!uploadResponse.ok) {
+        throw new Error("Upload failed");
+      }
       const { storageId } = await uploadResponse.json();
       await updateAvatar({ sessionUserId: user?.id as any, storageId });
       Alert.alert("Success", "Profile picture updated!");
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to update profile picture");
     }
   };
 
+  const handleFollowToggle = async (targetUserId: string, isFollowing: boolean) => {
+    if (!user) return;
+
+    try {
+      if (isFollowing) {
+        await unfollowUser({ sessionUserId: user.id as any, userId: targetUserId as any });
+        Alert.alert("Success", t("profile.unfollowSuccess"));
+      } else {
+        await followUser({ sessionUserId: user.id as any, userId: targetUserId as any });
+        Alert.alert("Success", t("profile.followSuccess"));
+      }
+    } catch {
+      Alert.alert(
+        "Error",
+        isFollowing ? t("profile.unfollowError") : t("profile.followError"),
+      );
+    }
+  };
+
+  const handleSendMessage = async (recipientId: string) => {
+    if (!user) return;
+
+    try {
+      await sendMessage({
+        sessionUserId: user.id as any,
+        recipientId: recipientId as any,
+        content: "Hi!",
+      });
+      setDiscoverModalVisible(false);
+      Alert.alert("Success", t("profile.sendMessageSuccess"));
+      router.push("/chat");
+    } catch {
+      Alert.alert("Error", t("profile.sendMessageError"));
+    }
+  };
+
   return (
-    <LinearGradient
-      colors={colors.gradients.background}
-      style={{ flex: 1, paddingTop: 50 }}
-    >
+    <LinearGradient colors={colors.gradients.background} style={{ flex: 1, paddingTop: 50 }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View style={styles.profileSection}>
-          {/* Profile Pic and Username Row */}
           <View style={styles.userInfoRow}>
             <Image
               source={{
@@ -171,12 +233,10 @@ export default function Profile() {
             </Text>
           </View>
 
-          {/* Bio */}
-          {user?.bio && (
+          {user?.bio ? (
             <Text style={[styles.bio, { color: colors.text }]}>{user.bio}</Text>
-          )}
+          ) : null}
 
-          {/* Edit Profile Button */}
           <TouchableOpacity
             style={[styles.editButton, { backgroundColor: colors.primary }]}
             onPress={() => {
@@ -185,41 +245,59 @@ export default function Profile() {
               setEditModalVisible(true);
             }}
           >
-            <Text style={[styles.editButtonText, { color: colors.surface }]}>
-              Edit Profile
-            </Text>
+            <Text style={[styles.editButtonText, { color: colors.surface }]}>Edit Profile</Text>
           </TouchableOpacity>
 
-          {/* Stats */}
           <View style={styles.stats}>
             <View style={styles.stat}>
-              <Text style={[styles.statNumber, { color: colors.text }]}>
-                {followersCount || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                Followers
-              </Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{followersCount || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Followers</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={[styles.statNumber, { color: colors.text }]}>
-                {followingCount || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                Following
-              </Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{followingCount || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Following</Text>
             </View>
           </View>
         </View>
 
-        {/* Achievements Section */}
-        {(achievements && achievements.length > 0) && (
+        <View style={styles.socialSection}>
+          <View
+            style={[
+              styles.socialCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.socialHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t("profile.discoverUsers")}
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                  {t("profile.discoverSubtitle")}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: colors.primary }]}
+                onPress={() => setDiscoverModalVisible(true)}
+              >
+                <Ionicons name="search" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {achievements && achievements.length > 0 ? (
           <View style={styles.achievementsSection}>
-            <Text style={[styles.sectionHeader, { color: colors.text }]}>
-              Achievements
-            </Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {achievements.map((achievement: any, index: number) => (
-                <View key={index} style={[styles.achievementCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View
+                  key={index}
+                  style={[
+                    styles.achievementCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
                   <View style={[styles.achievementIcon, { backgroundColor: colors.primary }]}>
                     <Ionicons name="trophy" size={24} color="#fff" />
                   </View>
@@ -233,8 +311,9 @@ export default function Profile() {
               ))}
             </ScrollView>
           </View>
-        )}
+        ) : null}
       </ScrollView>
+
       <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => setSettingsModalVisible(true)}
@@ -242,29 +321,116 @@ export default function Profile() {
         <Ionicons name="settings" size={24} color="#fff" />
       </TouchableOpacity>
 
-      {/* Settings Modal */}
+      <Modal
+        visible={discoverModalVisible}
+        animationType="slide"
+        onRequestClose={() => setDiscoverModalVisible(false)}
+      >
+        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity onPress={() => setDiscoverModalVisible(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t("profile.discoverUsers")}
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <ScrollView style={{ flex: 1, padding: 16 }}>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t("profile.searchPlaceholder")}
+              placeholderTextColor={colors.textMuted}
+            />
+            {searchQuery.trim().length === 0 ? (
+              <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                {t("profile.discoverSubtitle")}
+              </Text>
+            ) : null}
+            {searchQuery.trim().length > 0 && visibleSearchResults.length === 0 ? (
+              <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                {t("profile.emptySearch")}
+              </Text>
+            ) : null}
+
+            {visibleSearchResults.map((result: any) => {
+              const targetUserId = String(result._id || result.id);
+              const isFollowing = followingIds.has(targetUserId);
+
+              return (
+                <View
+                  key={targetUserId}
+                  style={[
+                    styles.searchResultCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
+                  <View style={styles.searchResultMain}>
+                    <Image
+                      source={{ uri: result.avatar || "https://placehold.co/50x50" }}
+                      style={styles.resultAvatar}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.resultName, { color: colors.text }]}>
+                        {result.full_name}
+                      </Text>
+                      <Text style={[styles.resultRole, { color: colors.textMuted }]}>
+                        {result.role}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.resultActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.resultActionButton,
+                        { backgroundColor: isFollowing ? colors.warning : colors.primary },
+                      ]}
+                      onPress={() => handleFollowToggle(targetUserId, isFollowing)}
+                    >
+                      <Text style={styles.resultActionText}>
+                        {isFollowing ? t("profile.unfollow") : t("profile.follow")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.resultActionButton,
+                        { backgroundColor: colors.success },
+                      ]}
+                      onPress={() => handleSendMessage(targetUserId)}
+                    >
+                      <Text style={styles.resultActionText}>{t("profile.message")}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
       <Modal
         visible={settingsModalVisible}
         animationType="slide"
         onRequestClose={() => setSettingsModalVisible(false)}
       >
-        <LinearGradient
-          colors={colors.gradients.background}
-          style={{ flex: 1 }}
-        >
-          <View
-            style={[styles.modalHeader, { backgroundColor: colors.surface }]}
-          >
+        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
             <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Settings
-            </Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Settings</Text>
             <View />
           </View>
           <ScrollView style={{ flex: 1, padding: 16, paddingTop: 32 }}>
-            {/* Appearance Section */}
             <View
               style={[
                 styles.section,
@@ -297,11 +463,9 @@ export default function Profile() {
                 <Text style={[styles.settingLabel, { color: colors.text }]}>
                   {t("settings.appearance.theme")}
                 </Text>
-                <View style={styles.themeSelector}>
+                <View style={styles.selectorChip}>
                   <Text style={{ color: colors.text }}>
-                    {isDarkMode
-                      ? t("settings.appearance.dark")
-                      : t("settings.appearance.light")}
+                    {isDarkMode ? t("settings.appearance.dark") : t("settings.appearance.light")}
                   </Text>
                   <Ionicons
                     name={isDarkMode ? "moon" : "sunny"}
@@ -313,7 +477,6 @@ export default function Profile() {
               </TouchableOpacity>
             </View>
 
-            {/* Language Section */}
             <View
               style={[
                 styles.section,
@@ -323,14 +486,11 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.language.title")}
               </Text>
-              <TouchableOpacity
-                onPress={showLanguagePicker}
-                style={styles.settingRow}
-              >
+              <TouchableOpacity onPress={showLanguagePicker} style={styles.settingRow}>
                 <Text style={[styles.settingLabel, { color: colors.text }]}>
                   {t("settings.language.select")}
                 </Text>
-                <View style={styles.languageSelector}>
+                <View style={styles.selectorChip}>
                   <Text style={{ color: colors.text }}>
                     {i18n.language === "pt"
                       ? t("settings.language.pt")
@@ -343,49 +503,21 @@ export default function Profile() {
               </TouchableOpacity>
             </View>
 
-            {/* Notifications Section */}
             <View
               style={[
                 styles.section,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Notifications
-              </Text>
-              <TouchableOpacity style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  Push Notifications
-                </Text>
-                <Ionicons name="toggle" size={32} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  Game Reminders
-                </Text>
-                <Ionicons name="toggle" size={32} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  Training Reminders
-                </Text>
-                <Ionicons name="toggle" size={32} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  New Messages
-                </Text>
-                <Ionicons name="toggle" size={32} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  New Followers
-                </Text>
-                <Ionicons name="toggle" size={32} color={colors.primary} />
-              </TouchableOpacity>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+              {["Push Notifications", "Game Reminders", "Training Reminders", "New Messages", "New Followers"].map((label) => (
+                <TouchableOpacity key={label} style={styles.settingRow}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
+                  <Ionicons name="toggle" size={32} color={colors.primary} />
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Account Section */}
             <View
               style={[
                 styles.section,
@@ -400,24 +532,16 @@ export default function Profile() {
                   <Text style={[styles.accountText, { color: colors.text }]}>
                     {t("settings.account.username")}: {user?.fullName || "N/A"}
                   </Text>
-                  <Text
-                    style={[styles.accountText, { color: colors.textMuted }]}
-                  >
+                  <Text style={[styles.accountText, { color: colors.textMuted }]}>
                     {t("settings.account.email")}: {user?.email || "N/A"}
                   </Text>
                 </View>
                 <View style={styles.accountActions}>
                   <Image
-                    source={{
-                      uri:
-                        user?.avatar_url || "https://placehold.co/150x150",
-                    }}
+                    source={{ uri: user?.avatar_url || "https://placehold.co/150x150" }}
                     style={styles.avatarSmall}
                   />
-                  <TouchableOpacity
-                    style={styles.changeButton}
-                    onPress={handleChangeImage}
-                  >
+                  <TouchableOpacity style={styles.changeButton} onPress={handleChangeImage}>
                     <Text style={{ color: colors.primary }}>
                       {t("settings.account.changeImage")}
                     </Text>
@@ -426,16 +550,13 @@ export default function Profile() {
               </View>
             </View>
 
-            {/* Privacy Section */}
             <View
               style={[
                 styles.section,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Privacidade
-              </Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Privacidade</Text>
               <TouchableOpacity
                 onPress={async () => {
                   try {
@@ -444,20 +565,18 @@ export default function Profile() {
                     });
                     Alert.alert(
                       "Sucesso",
-                      `Perfil agora está ${newVisibility.is_public ? "público" : "privado"}`
+                      `Perfil agora estÃ¡ ${newVisibility.is_public ? "pÃºblico" : "privado"}`,
                     );
-                  } catch (error) {
+                  } catch {
                     Alert.alert("Erro", "Falha ao alterar visibilidade");
                   }
                 }}
                 style={styles.settingRow}
               >
-                <Text style={[styles.settingLabel, { color: colors.text }]}>
-                  Perfil Público
-                </Text>
-                <View style={styles.toggleSelector}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Perfil PÃºblico</Text>
+                <View style={styles.selectorChip}>
                   <Text style={{ color: colors.text }}>
-                    {profileVisibility === true ? "Público" : "Privado"}
+                    {profileVisibility === true ? "PÃºblico" : "Privado"}
                   </Text>
                   <Ionicons
                     name={profileVisibility === true ? "globe" : "lock-closed"}
@@ -468,13 +587,12 @@ export default function Profile() {
                 </View>
               </TouchableOpacity>
               <Text style={[styles.settingDescription, { color: colors.textMuted }]}>
-                {profileVisibility === true 
-                  ? "Seu perfil é visível para outros utilizadores na pesquisa" 
-                  : "Seu perfil só é visível para você"}
+                {profileVisibility === true
+                  ? "Seu perfil Ã© visÃ­vel para outros utilizadores na pesquisa"
+                  : "Seu perfil sÃ³ Ã© visÃ­vel para vocÃª"}
               </Text>
             </View>
 
-            {/* Security Section */}
             <View
               style={[
                 styles.section,
@@ -496,7 +614,6 @@ export default function Profile() {
               </TouchableOpacity>
             </View>
 
-            {/* Privacy Section */}
             <View
               style={[
                 styles.section,
@@ -506,11 +623,7 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.privacy.title")}
               </Text>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleDeleteAccount}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={styles.button} onPress={handleDeleteAccount} activeOpacity={0.7}>
                 <Text style={[styles.buttonText, { color: colors.danger }]}>
                   {t("settings.privacy.deleteAccount")}
                 </Text>
@@ -520,29 +633,19 @@ export default function Profile() {
         </LinearGradient>
       </Modal>
 
-      {/* Edit Profile Modal */}
       <Modal
         visible={editModalVisible}
         animationType="slide"
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <LinearGradient
-          colors={colors.gradients.background}
-          style={{ flex: 1 }}
-        >
-          <View
-            style={[styles.modalHeader, { backgroundColor: colors.surface }]}
-          >
+        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
             <TouchableOpacity onPress={() => setEditModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Edit Profile
-            </Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Profile</Text>
             <TouchableOpacity onPress={handleEditProfile}>
-              <Text style={[styles.saveText, { color: colors.primary }]}>
-                Save
-              </Text>
+              <Text style={[styles.saveText, { color: colors.primary }]}>Save</Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -577,16 +680,12 @@ export default function Profile() {
               placeholderTextColor={colors.textMuted}
               multiline
             />
-            <Text style={[styles.label, { color: colors.text }]}>
-              Profile Picture
-            </Text>
+            <Text style={[styles.label, { color: colors.text }]}>Profile Picture</Text>
             <TouchableOpacity
               onPress={handleChangeImage}
               style={[styles.editButton, { backgroundColor: colors.primary }]}
             >
-              <Text style={[styles.editButtonText, { color: colors.surface }]}>
-                Change Picture
-              </Text>
+              <Text style={[styles.editButtonText, { color: colors.surface }]}>Change Picture</Text>
             </TouchableOpacity>
           </ScrollView>
         </LinearGradient>
@@ -659,14 +758,39 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
   },
-  achievementsSection: {
-    padding: 16,
-    paddingTop: 0,
+  socialSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  sectionHeader: {
+  socialCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+  },
+  socialHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  socialButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
     marginBottom: 12,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  achievementsSection: {
+    padding: 16,
+    paddingTop: 0,
   },
   achievementCard: {
     width: 140,
@@ -728,42 +852,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 16,
   },
   settingLabel: {
     fontSize: 16,
+    flex: 1,
   },
-  themeSelector: {
+  selectorChip: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: "rgba(0,0,0,0.05)",
     borderRadius: 8,
-  },
-  languageSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: 8,
-  },
-  toggleSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: 8,
+    gap: 8,
   },
   settingDescription: {
     fontSize: 14,
@@ -774,6 +880,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 16,
   },
   accountInfo: {
     flex: 1,
@@ -801,5 +908,48 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  searchResultCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  searchResultMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  resultAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+  },
+  resultName: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  resultRole: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  resultActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  resultActionButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  resultActionText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });

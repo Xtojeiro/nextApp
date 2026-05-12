@@ -1,14 +1,23 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
+  ...authTables,
+
   // Users base table
   users: defineTable({
-    full_name: v.string(), // Changed from name to match existing data
-    email: v.string(),
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    full_name: v.optional(v.string()), // Changed from name to match existing data
     clerk_id: v.optional(v.string()), // Clerk authentication ID
     password_hash: v.optional(v.string()), // Changed to match existing data
-    role: v.union(v.literal("PLAYER"), v.literal("COACH"), v.literal("SCOUT")), // Changed to match existing data
+    role: v.optional(v.union(v.literal("PLAYER"), v.literal("COACH"), v.literal("SCOUT"))), // Changed to match existing data
     avatar: v.optional(v.string()),
     bio: v.optional(v.string()),
     location: v.optional(v.string()),
@@ -17,12 +26,13 @@ export default defineSchema({
       v.union(v.literal("male"), v.literal("female"), v.literal("other")),
     ),
     push_token: v.optional(v.string()), // Added to match existing data
-    is_active: v.boolean(), // Changed to snake_case
+    is_active: v.optional(v.boolean()), // Changed to snake_case
     is_public: v.optional(v.boolean()), // Added for profile visibility
-    created_at: v.number(),
-    updated_at: v.number(),
+    created_at: v.optional(v.number()),
+    updated_at: v.optional(v.number()),
   })
-    .index("by_email", ["email"])
+    .index("email", ["email"])
+    .index("phone", ["phone"])
     .index("by_clerk_id", ["clerk_id"])
     .index("by_role", ["role"]),
 

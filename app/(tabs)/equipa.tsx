@@ -1,9 +1,9 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/utils/apiClient";
+import type { Id } from "@/utils/apiTypes";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import {
@@ -19,9 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TeamAthlete = NonNullable<
-  ReturnType<typeof useQuery<typeof api.teams.getTeamAthletes>>
->[number];
+type TeamAthlete = any;
 
 export default function Equipa() {
   const { colors } = useTheme();
@@ -38,7 +36,7 @@ export default function Equipa() {
     api.teams.getTeamAthletes,
     convexUser ? { sessionUserId: convexUser._id } : "skip",
   );
-  const athletes = athletesQuery ?? [];
+  const athletes = (athletesQuery ?? []) as TeamAthlete[];
   const addAthleteNote = useMutation(api.users.addAthleteNote);
 
   const [search, setSearch] = useState("");

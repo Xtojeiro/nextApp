@@ -1,25 +1,55 @@
 import useAuth, { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import "@/utils/i18n";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Stack, useRouter } from "expo-router";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { ConvexReactClient } from "convex/react";
+import { Stack, usePathname, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 
-const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!);
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+
+if (!convexUrl) {
+  throw new Error("Missing EXPO_PUBLIC_CONVEX_URL. Set it in your environment before starting the app.");
+}
+
+const convex = new ConvexReactClient(convexUrl, {
+  unsavedChangesWarning: false,
+});
+
+const secureStorage = {
+  getItem: SecureStore.getItemAsync,
+  setItem: SecureStore.setItemAsync,
+  removeItem: SecureStore.deleteItemAsync,
+};
+
+function getHomeRoute(accountType: ReturnType<typeof useAuth>["accountType"]) {
+  if (accountType === "TREINADOR") return "/jogos";
+  return "/dashboard";
+}
 
 function RootLayoutNav() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, accountType } = useAuth();
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.replace("/(tabs)");
-      } else {
-        router.replace("/login");
-      }
+    if (isLoading) {
+      return;
     }
-  }, [isLoading, router, user]);
+
+    if (user) {
+      if (pathname === "/" || pathname === "/login") {
+        router.replace(getHomeRoute(accountType));
+      }
+      return;
+    }
+
+    if (pathname !== "/login" && pathname !== "/verify") {
+      router.replace("/login");
+    }
+  }, [accountType, isLoading, pathname, router, user]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -32,12 +62,15 @@ function RootLayoutNav() {
 
 export default function Layout() {
   return (
-    <ConvexProvider client={convex}>
+    <ConvexAuthProvider
+      client={convex}
+      storage={Platform.OS === "web" ? undefined : secureStorage}
+    >
       <AuthProvider>
         <ThemeProvider>
           <RootLayoutNav />
         </ThemeProvider>
       </AuthProvider>
-    </ConvexProvider>
+    </ConvexAuthProvider>
   );
 }

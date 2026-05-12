@@ -63,7 +63,6 @@
   },
   "tabs": {
     "dashboard": "Dashboard",
-    "feed": "Feed",
     "treinos": "Treinos",
     "messages": "Mensagens",
     "profile": "Perfil",
@@ -142,18 +141,21 @@
     "submit": "Submeter"
   },
   "profile": {
-    "title": "Perfil",
-    "editProfile": "Editar Perfil",
-    "followers": "Seguidores",
-    "following": "Seguindo",
-    "bio": "Bio",
-    "name": "Nome",
-    "profilePicture": "Foto de Perfil",
-    "changePicture": "Alterar Foto",
-    "save": "Salvar",
-    "cancel": "Cancelar"
+    "discoverUsers": "Descobrir utilizadores",
+    "discoverSubtitle": "Procura atletas, treinadores e olheiros e gere as tuas ligacoes.",
+    "searchPlaceholder": "Pesquisar utilizadores...",
+    "emptySearch": "Nenhum utilizador encontrado.",
+    "follow": "Seguir",
+    "unfollow": "Deixar de seguir",
+    "message": "Mensagem",
+    "sendMessageSuccess": "Mensagem enviada",
+    "sendMessageError": "Falha ao enviar mensagem",
+    "followSuccess": "Utilizador seguido",
+    "followError": "Falha ao seguir utilizador",
+    "unfollowSuccess": "Utilizador removido",
+    "unfollowError": "Falha ao deixar de seguir utilizador"
   },
-"team": {
+  "team": {
     "title": "Minha Equipa",
     "createTeam": "Criar Equipa",
     "teamName": "Nome da Equipa",

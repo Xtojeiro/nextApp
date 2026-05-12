@@ -60,5 +60,27 @@
     "confirmPassword": "Confirmar Contraseña",
     "next": "Siguiente",
     "back": "Atrás"
+  },
+  "tabs": {
+    "dashboard": "Panel",
+    "treinos": "Entrenamientos",
+    "messages": "Mensajes",
+    "profile": "Perfil",
+    "equipa": "Equipo"
+  },
+  "profile": {
+    "discoverUsers": "Descubrir usuarios",
+    "discoverSubtitle": "Busca jugadores, entrenadores y ojeadores y gestiona tus conexiones.",
+    "searchPlaceholder": "Buscar usuarios...",
+    "emptySearch": "No se encontraron usuarios.",
+    "follow": "Seguir",
+    "unfollow": "Dejar de seguir",
+    "message": "Mensaje",
+    "sendMessageSuccess": "Mensaje enviado",
+    "sendMessageError": "No se pudo enviar el mensaje",
+    "followSuccess": "Usuario seguido",
+    "followError": "No se pudo seguir al usuario",
+    "unfollowSuccess": "Usuario eliminado",
+    "unfollowError": "No se pudo dejar de seguir al usuario"
   }
 }

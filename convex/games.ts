@@ -48,7 +48,7 @@ export const getGames = query({
           creator: creator
             ? {
                 _id: creator._id,
-                full_name: creator.full_name,
+                full_name: creator.full_name || creator.name || creator.email || "User",
               }
             : null,
         };

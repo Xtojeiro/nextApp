@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
@@ -13,9 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { api } from "../../convex/_generated/api";
-import useAuth from "../../hooks/useAuth";
-import useTheme from "../../hooks/useTheme";
+import { api } from "@/utils/apiClient";
+import useAuth from "@/hooks/useAuth";
+import useTheme from "@/hooks/useTheme";
 
 export default function ChatTab() {
   const { user } = useAuth();

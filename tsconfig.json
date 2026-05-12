@@ -9,9 +9,22 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "navigation/**/*.ts",
+    "navigation/**/*.tsx",
+    "types/**/*.ts",
+    "utils/**/*.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "convex/**/*",
+    "server/**/*",
+    "scripts/**/*"
   ]
 }

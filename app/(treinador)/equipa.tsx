@@ -1,11 +1,11 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import EmptyState from "@/components/EmptyState";
 import ErrorView from "@/components/ErrorView";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";

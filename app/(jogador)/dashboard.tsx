@@ -1,4 +1,4 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import DashboardStats from "@/components/DashboardStats";

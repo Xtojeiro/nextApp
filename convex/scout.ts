@@ -13,7 +13,7 @@ export const getObservedAthletes = query({
 
     const scout = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("email", (q) => q.eq("email", identity.email!))
       .first();
 
     if (!scout || scout.role !== "SCOUT") {
@@ -147,7 +147,7 @@ export const createScoutReport = mutation({
 
     const scout = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("email", (q) => q.eq("email", identity.email!))
       .first();
 
     if (!scout || scout.role !== "SCOUT") {

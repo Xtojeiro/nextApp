@@ -63,7 +63,6 @@
   },
   "tabs": {
     "dashboard": "Dashboard",
-    "feed": "Feed",
     "treinos": "Treinos",
     "messages": "Messages",
     "profile": "Profile",
@@ -120,18 +119,21 @@
     "submit": "Submit"
   },
   "profile": {
-    "title": "Perfil",
-    "editProfile": "Edit Profile",
-    "followers": "Followers",
-    "following": "Following",
-    "bio": "Bio",
-    "name": "Name",
-    "profilePicture": "Profile Picture",
-    "changePicture": "Change Picture",
-    "save": "Save",
-    "cancel": "Cancel"
+    "discoverUsers": "Discover users",
+    "discoverSubtitle": "Search players, coaches, and scouts and manage your connections.",
+    "searchPlaceholder": "Search users...",
+    "emptySearch": "No users found.",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "message": "Message",
+    "sendMessageSuccess": "Message sent",
+    "sendMessageError": "Failed to send message",
+    "followSuccess": "User followed",
+    "followError": "Failed to follow user",
+    "unfollowSuccess": "User removed",
+    "unfollowError": "Failed to unfollow user"
   },
-"dashboard": {
+  "dashboard": {
     "title": "Dashboard",
     "subtitle": "Overview of your sports activity",
     "activityHeatmap": "Activity Heatmap",

@@ -48,7 +48,7 @@ export const loginUser = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
+      .withIndex("email", (q) => q.eq("email", email))
       .first();
 
     if (!user?.password_hash) {
@@ -80,6 +80,61 @@ export const getCurrentUser = query({
   },
   handler: async (ctx, args) => {
     return await resolveSessionUser(ctx, args.sessionUserId);
+  },
+});
+
+export const ensureUserProfile = mutation({
+  args: {
+    fullName: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("PLAYER"), v.literal("COACH"), v.literal("SCOUT"))),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx);
+    const now = Date.now();
+    const fullName = sanitizeString(args.fullName || user.full_name || user.name || user.email || "User");
+    const role = args.role || user.role || "PLAYER";
+
+    await ctx.db.patch(user._id, {
+      full_name: fullName,
+      name: user.name || fullName,
+      role,
+      is_active: true,
+      is_public: user.is_public ?? true,
+      created_at: user.created_at || now,
+      updated_at: now,
+    });
+
+    if (role === "PLAYER") {
+      const existingPlayer = await ctx.db
+        .query("players")
+        .withIndex("by_userId", (q) => q.eq("userId", user._id))
+        .first();
+      if (!existingPlayer) {
+        await ctx.db.insert("players", {
+          userId: user._id,
+          stats: {
+            gamesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            points: 0,
+            assists: 0,
+            rebounds: 0,
+          },
+        });
+      }
+    }
+
+    if (role === "COACH") {
+      const existingCoach = await ctx.db
+        .query("coaches")
+        .withIndex("by_userId", (q) => q.eq("userId", user._id))
+        .first();
+      if (!existingCoach) {
+        await ctx.db.insert("coaches", { userId: user._id });
+      }
+    }
+
+    return { success: true };
   },
 });
 
@@ -127,7 +182,7 @@ export const registerUser = mutation({
 
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
+      .withIndex("email", (q) => q.eq("email", email))
       .first();
 
     if (existingUser) {
@@ -292,7 +347,7 @@ export const searchUsers = query({
       .filter(
         (user) =>
           user.is_public &&
-          (user.full_name.toLowerCase().includes(sanitizedQuery) ||
+          ((user.full_name || user.name || user.email || "").toLowerCase().includes(sanitizedQuery) ||
             user.bio?.toLowerCase().includes(sanitizedQuery) ||
             user.location?.toLowerCase().includes(sanitizedQuery)),
       )

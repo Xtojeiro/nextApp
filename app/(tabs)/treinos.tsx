@@ -1,9 +1,9 @@
-import { api } from "@/convex/_generated/api";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { api } from "@/utils/apiClient";
+import type { Doc, Id } from "@/utils/apiTypes";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
@@ -35,7 +35,7 @@ export default function Treinos() {
     api.workouts.getWorkouts,
     user ? { sessionUserId: user.id as Id<"users"> } : "skip",
   );
-  const workouts = workoutsQuery ?? [];
+  const workouts = (workoutsQuery ?? []) as Workout[];
   const createWorkout = useMutation(api.workouts.createWorkout);
   const startWorkout = useMutation(api.workouts.startWorkout);
   const completeWorkout = useMutation(api.workouts.completeWorkout);

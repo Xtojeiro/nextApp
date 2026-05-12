@@ -1,7 +1,7 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";

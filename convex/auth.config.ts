@@ -1,5 +1,10 @@
-import { AuthConfig } from 'convex/server';
+import { AuthConfig } from "convex/server";
 
 export default {
-  providers: [],
+  providers: [
+    {
+      domain: process.env.CONVEX_SITE_URL as string,
+      applicationID: "convex",
+    },
+  ],
 } satisfies AuthConfig;

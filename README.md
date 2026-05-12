@@ -1,237 +1,78 @@
-# NextApp - Plataforma de Gestão Desportiva
+# NextApp
 
-Uma aplicação mobile multiplataforma desenvolvida com **Expo** (React Native) e **Convex** como backend, focada na gestão de equipas desportivas para jogadores, treinadores e olheiros.
+Aplicacao multiplataforma feita com Expo, React Native, Expo Router e Convex.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20Web-lightgrey)
-![Expo SDK](https://img.shields.io/badge/Expo-SDK%2054-black)
+## Stack atual
 
----
+- Frontend: Expo, React Native, Expo Router, TypeScript
+- Backend e base de dados: Convex
+- Autenticacao: Convex Auth com email e palavra-passe
+- Uploads: Convex Storage
+- Web hosting: export estatico do Expo servido no subdominio
 
-## 📋 Índice
+## Estrutura relevante
 
-- [Visão Geral](#-visão-geral)
-- [Funcionalidades](#-funcionalidades)
-- [Tecnologias](#-tecnologias)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Instalação](#-instalação)
-- [Configuração](#-configuração)
-- [Scripts Disponíveis](#-scripts-disponíveis)
-- [Estado do Desenvolvimento](#-estado-do-desenvolvimento)
+- `app/`: rotas e ecras Expo Router
+- `hooks/`: estado de autenticacao, tema e hooks partilhados
+- `convex/`: schema, funcoes, auth e HTTP routes do Convex
+- `utils/apiClient.ts`: reexport da API gerada pelo Convex
 
----
+## Instalacao local
 
-## 🎯 Visão Geral
-
-NextApp é uma plataforma completa para gestão desportiva que conecta **jogadores**, **treinadores** e **olheiros**. A aplicação oferece ferramentas para:
-
-- Gestão de treinos e exercícios
-- Acompanhamento de jogos e estatísticas
-- Comunicação entre utilizadores (chat)
-- Planeamento de eventos e calendário
-- Análise de desempenho
-- Gestão de equipas
-
----
-
-## ⚡ Funcionalidades
-
-### 👤 Para Jogadores/Atletas
-- Dashboard personalizado com estatísticas
-- Registo e acompanhamento de treinos
-- Calendário de jogos e eventos
-- Chat com treinadores e equipas
-- Perfil público/privado
-
-### 🏋️ Para Treinadores
-- Gestão de equipas e atletas
-- Criação de planos de treino
-- Agendamento de jogos e eventos
-- Notas sobre atletas
-- Dashboard de estatísticas da equipa
-
-### 🔍 Para Olheiros
-- Pesquisa de jogadores
-- Visualização de perfis e estatísticas
-- Sistema de seguir jogadores
-
----
-
-## 🛠️ Tecnologias
-
-### Frontend
-| Tecnologia          | Versão     | Descrição                   |
-|---------------------|------------|-----------------------------|
-| **Expo**            | ~54.0      | Framework React Native      |
-| **React**           | 19.1.0     | Biblioteca UI               |
-| **React Native**    | 0.81.5     | Mobile development          |
-| **TypeScript**      | ~5.9.2     | Tipagem estática            |
-| **Expo Router**     | ~6.0       | File-based routing          |
-
-### Backend
-| Tecnologia          | Versão     | Descrição                   |
-|---------------------|------------|-----------------------------|
-| **Convex**          | ^1.31.6    | Backend-as-a-Service        |
-
-### Bibliotecas Principais
-- `expo-image-picker` - Seleção de imagens
-- `expo-haptics` - Feedback tátil
-- `react-native-reanimated` - Animações
-- `react-native-gesture-handler` - Gestos
-- `i18next` / `react-i18next` - Internacionalização
-- `bcryptjs` - Hash de passwords
-
----
-
-## 📁 Estrutura do Projeto
-
-```
-nextApp/
-├── app/                          # Páginas da aplicação (file-based routing)
-│   ├── (tabs)/                   # Tabs principais
-│   │   ├── _layout.tsx           # Layout das tabs
-│   │   ├── index.tsx             # Feed/Home
-│   │   ├── dashboard.tsx         # Dashboard principal
-│   │   ├── treinos.tsx           # Gestão de treinos
-│   │   ├── jogos.tsx             # Calendário de jogos
-│   │   ├── planeamento.tsx       # Planeamento de eventos
-│   │   ├── chat.tsx              # Sistema de mensagens
-│   │   ├── equipa.tsx            # Gestão de equipa
-│   │   ├── analise.tsx           # Análise de desempenho
-│   │   └── profile.tsx           # Perfil do utilizador
-│   ├── _layout.tsx               # Layout principal
-│   ├── login.tsx                 # Página de login
-│   └── register.tsx              # Registo de utilizador
-├── components/                   # Componentes reutilizáveis
-│   ├── CoachDashboard.tsx        # Dashboard para treinadores
-│   ├── Header.tsx                # Cabeçalho
-│   └── LoadingSpinner.tsx        # Indicador de carregamento
-├── convex/                       # Backend Convex
-│   ├── schema.ts                 # Esquema da base de dados
-│   ├── users.ts                  # Funções de utilizadores
-│   ├── workouts.ts               # Funções de treinos
-│   ├── chat.ts                   # Funções de chat
-│   ├── games.ts                  # Funções de jogos
-│   └── auth.config.ts            # Configuração de autenticação
-├── hooks/                        # Custom React hooks
-├── utils/                        # Funções utilitárias
-├── assets/                       # Imagens e recursos estáticos
-├── docs/                         # Documentação do projeto
-│   ├── project_analysis.md       # Análise detalhada
-│   └── tasks.md                  # Lista de tarefas
-├── app.json                      # Configuração Expo
-├── package.json                  # Dependências
-└── tsconfig.json                 # Configuração TypeScript
+```bash
+npm install
+cp .env.example .env.local
 ```
 
----
+Define `EXPO_PUBLIC_CONVEX_URL` em `.env.local` com o URL do teu deployment Convex.
 
-## 🚀 Instalação
+## Desenvolvimento
 
-### Pré-requisitos
-- Node.js (versão LTS recomendada)
-- npm ou yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Conta no [Convex](https://convex.dev)
+Terminal 1:
 
-### Passos
+```bash
+npm run convex:dev
+```
 
-1. **Clonar o repositório**
-   ```bash
-   git clone <url-do-repositorio>
-   cd nextApp
-   ```
+Terminal 2:
 
-2. **Instalar dependências**
-   ```bash
-   npm install
-   ```
+```bash
+npm run start
+```
 
-3. **Configurar variáveis de ambiente**
-   
-   Criar ficheiro `.env.local` na raiz:
-   ```env
-   CONVEX_DEPLOYMENT=<seu-deployment>
-   EXPO_PUBLIC_CONVEX_URL=<url-do-convex>
-   ```
+Web:
 
-4. **Iniciar o servidor Convex**
-   ```bash
-   npx convex dev
-   ```
+```bash
+npm run web
+```
 
-5. **Iniciar a aplicação**
-   ```bash
-   npx expo
-   ```
+## Producao
 
----
+```bash
+npm ci
+npm run convex:deploy
+npm run export:web
+```
 
-## Para ultrapassar possiveis erros
- - depois do login ou logon fazer reset na consola do expo clicando no 'r' 
- - existem paginas na conta de treinador e olheiro que ainda nao estao no sitio correto, por isso ao abri-las da erro
-   a resolucao e a mesma clicar no 'r' e nao voltar a abrir a pagina
- - a conta de olheiro ainda nao consegue ser testada
- - ainda nao esta disponivel a funcionalidade de imagem de perfil
+O comando de export cria `dist/`, que pode ser servido por Node, PM2, Nginx ou Caddy atras do subdominio.
 
-estes sao os erros mais comuns de encontrar e nao estao previstos estarem terminados de acordo com o diagrama de gant enviado anteriormente
+## Variaveis de ambiente
 
+```env
+EXPO_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+CONVEX_DEPLOY_KEY=
+JWT_PRIVATE_KEY=
+```
 
+- `EXPO_PUBLIC_CONVEX_URL`: URL publico do deployment Convex usado pelo cliente Expo.
+- `CONVEX_DEPLOY_KEY`: chave apenas para deploy no servidor/CI. Nao deve ser exposta ao bundle cliente.
+- `JWT_PRIVATE_KEY`: chave privada usada pelo Convex Auth para assinar sessoes. Deve ser configurada no ambiente do deployment Convex, nunca no cliente.
 
+## Checks
 
-
-
-## ⚙️ Configuração
-
-### Convex Backend
-O backend utiliza Convex com as seguintes tabelas:
- 
-| Tabela              | Descrição                                        |
-|---------------------|--------------------------------------------------|
-| `users`             | Utilizadores (jogadores, treinadores, olheiros)  |
-| `players`           | Dados estendidos de jogadores                    |
-| `coaches`           | Dados estendidos de treinadores                  |
-| `teams`             | Equipas                                          |
-| `workouts`          | Treinos                                          |
-| `workoutLogs`       | Registos de treinos completados                  |
-| `games`             | Jogos                                            |
-| `events`            | Eventos de calendário                            |
-| `trainingPlans`     | Planos de treino                                 |
-| `conversations`     | Conversas de chat                                |
-| `messages`          | Mensagens                                        |
-| `blockedUsers`      | Utilizadores bloqueados                          |
-| `follows`           | Sistema de seguir                                |
-| `posts`             | Publicações                                      |
-| `scoutReports`      | Relatórios de olheiros sobre atletas             |
-| `invites`           | Convites de treinadores para atletas             |
-
-
-
-## 🔧 Desenvolvimento
-
-### Requisitos de Desenvolvimento
-- Editor: VS Code recomendado
-- Extensões: ESLint, TypeScript, Expo Tools
-
-
-## 📱 Plataformas Suportadas
-
-- ✅ iOS (iPhone e iPad)
-- ✅ Android
-- ✅ Web
-
----
-
-## 📄 Licença
-
-Projeto privado - Todos os direitos reservados.
-
----
-
-## 👥 Autor
-
-**Tomás** - Projeto de Aptidão Profissional (PAP)
-
----
-
-*Última atualização: Fevereiro 2026*
+```bash
+npm run lint
+npx tsc --noEmit
+npx tsc -p convex/tsconfig.json
+npm run export:web
+```

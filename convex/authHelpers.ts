@@ -1,29 +1,21 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 
 type ConvexCtx = {
   db: any;
-  auth: {
-    getUserIdentity: () => Promise<{ email?: string | null } | null>;
-  };
+  auth: any;
 };
 
 export async function resolveSessionUser(
   ctx: ConvexCtx,
   sessionUserId?: Id<"users">,
 ) {
-  if (sessionUserId) {
-    return await ctx.db.get(sessionUserId);
+  const authUserId = await getAuthUserId(ctx);
+  if (authUserId) {
+    return await ctx.db.get(authUserId);
   }
 
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity?.email) {
-    return null;
-  }
-
-  return await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
+  return sessionUserId ? await ctx.db.get(sessionUserId) : null;
 }
 
 export async function requireSessionUser(

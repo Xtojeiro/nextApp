@@ -1,16 +1,14 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/utils/apiClient";
 import { AccountType, ROLE_TO_ACCOUNT_TYPE } from "@/types/user";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useConvex } from "convex/react";
+import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
 import {
   createContext,
   ReactNode,
   useContext,
-  useEffect,
+  useMemo,
   useState,
 } from "react";
-
-const AUTH_STORAGE_KEY = "nextapp.auth.userId";
 
 interface User {
   id: string;
@@ -52,16 +50,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<undefined | AuthContextType>(undefined);
 
-function mapConvexUser(convexUser: any): User {
+function mapConvexUser(convexUser: any): User | null {
+  if (!convexUser) return null;
+  const fullName = convexUser.full_name || convexUser.name || convexUser.email || "User";
+  const role = convexUser.role || "PLAYER";
+
   return {
-    id: convexUser._id.toString(),
-    _id: convexUser._id.toString(),
-    email: convexUser.email,
-    full_name: convexUser.full_name,
-    fullName: convexUser.full_name,
-    role: convexUser.role,
-    avatar: convexUser.avatar,
-    avatar_url: convexUser.avatar,
+    id: convexUser._id,
+    _id: convexUser._id,
+    email: convexUser.email || "",
+    full_name: fullName,
+    fullName,
+    role,
+    avatar: convexUser.avatar || convexUser.image,
+    avatar_url: convexUser.avatar || convexUser.image,
     bio: convexUser.bio,
     is_public: convexUser.is_public,
   };
@@ -75,65 +77,27 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const convex = useConvex();
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSignedIn, setIsSignedIn] = useState(false);
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+  const { signIn, signOut } = useAuthActions();
+  const convexUser = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const loadStoredSession = async () => {
-    setIsLoading(true);
-    try {
-      const storedUserId = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-      if (!storedUserId) {
-        setUser(null);
-        setIsSignedIn(false);
-        return;
-      }
+  const user = useMemo(() => mapConvexUser(convexUser), [convexUser]);
+  const isLoading = isAuthLoading || (isAuthenticated && convexUser === undefined);
+  const isSignedIn = Boolean(isAuthenticated && user);
 
-      const convexUser = await convex.query(api.users.getCurrentUser, {
-        sessionUserId: storedUserId as any,
-      });
-
-      if (!convexUser) {
-        await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-        setUser(null);
-        setIsSignedIn(false);
-        setAuthError("Sessao invalida. Faz login novamente.");
-        return;
-      }
-
-      setUser(mapConvexUser(convexUser));
-      setIsSignedIn(true);
-      setAuthError(null);
-    } catch (error) {
-      await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-      setUser(null);
-      setIsSignedIn(false);
-      setAuthError(getErrorMessage(error, "Nao foi possivel restaurar a sessao."));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadStoredSession();
-  }, []);
-
-  const getAccountType = (role: User["role"]): AccountType => {
-    return ROLE_TO_ACCOUNT_TYPE[role] || "JOGADOR";
-  };
+  const accountType = user
+    ? ROLE_TO_ACCOUNT_TYPE[user.role] || "JOGADOR"
+    : null;
 
   const login = async (email: string, password: string): Promise<AuthActionResult> => {
     setAuthError(null);
     try {
-      const result = await convex.mutation(api.users.loginUser, {
-        email,
+      await signIn("password", {
+        email: email.trim().toLowerCase(),
         password,
+        flow: "signIn",
       });
-
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, result.userId.toString());
-      await loadStoredSession();
       return { ok: true };
     } catch (error) {
       const message = getErrorMessage(error, "Nao foi possivel iniciar sessao.");
@@ -150,17 +114,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     role: "PLAYER" | "COACH" | "SCOUT" = "PLAYER",
   ): Promise<AuthActionResult> => {
     setAuthError(null);
-    try {
-      const result = await convex.mutation(api.users.registerUser, {
-        name: fullName,
-        email,
-        password,
-        confirmPassword,
-        role,
-      });
+    if (password !== confirmPassword) {
+      const message = "As palavras-passe nao coincidem.";
+      setAuthError(message);
+      return { ok: false, error: message };
+    }
 
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, result.userId.toString());
-      await loadStoredSession();
+    try {
+      await signIn("password", {
+        email: email.trim().toLowerCase(),
+        password,
+        name: fullName.trim(),
+        role,
+        flow: "signUp",
+      });
       return { ok: true };
     } catch (error) {
       const message = getErrorMessage(error, "Nao foi possivel criar a conta.");
@@ -170,21 +137,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-    setUser(null);
-    setIsSignedIn(false);
+    await signOut();
     setAuthError(null);
   };
 
   const refreshUser = async () => {
-    await loadStoredSession();
+    setAuthError(null);
   };
 
   const clearAuthError = () => {
     setAuthError(null);
   };
-
-  const accountType = user ? getAccountType(user.role) : null;
 
   return (
     <AuthContext.Provider
