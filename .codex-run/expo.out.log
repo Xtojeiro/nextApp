@@ -1,6 +1,6 @@
 
 > nextapp@1.0.0 web
-> expo start --web --port 8081
+> expo start --web
 
 env: load .env.local
 env: export CONVEX_DEPLOYMENT EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL JWT_PRIVATE_KEY
