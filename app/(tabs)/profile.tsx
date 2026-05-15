@@ -9,7 +9,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { optionalText, requiredText } from "@/utils/formValidation";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   ScrollView,
@@ -20,15 +22,18 @@ import {
   View,
 } from "react-native";
 
+type ConfirmAction = "logout" | "deleteAccount";
+
 export default function Profile() {
-  const { colors, isDarkMode, toggleDarkMode } = useTheme();
-  const { user, logout } = useAuth();
+  const { colors, isDarkMode, setDarkMode } = useTheme();
+  const { user, accountType, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
   const updateUser = useMutation(api.users.updateUser as any);
   const toggleProfileVisibility = useMutation(api.users.toggleProfileVisibility as any);
   const deleteAccount = useMutation(api.users.deleteAccount as any);
+  const changePasswordMutation = useMutation((api.users as any).changePassword);
   const followUser = useMutation(api.follows.followUser as any);
   const unfollowUser = useMutation(api.follows.unfollowUser as any);
   const sendMessage = useMutation(api.chat.sendMessage as any);
@@ -62,6 +67,13 @@ export default function Profile() {
   const [editName, setEditName] = useState(user?.fullName || "");
   const [editBio, setEditBio] = useState(user?.bio || "");
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const searchResults = useQuery(
     api.users.searchUsers,
@@ -74,72 +86,94 @@ export default function Profile() {
   const visibleSearchResults = (searchResults || []).filter(
     (result: any) => (result._id || result.id) !== user?.id,
   );
+  const accountTypeLabel =
+    accountType === "TREINADOR"
+      ? t("auth.accountTypes.coach")
+      : accountType === "OLHEIRO"
+        ? t("auth.accountTypes.scout")
+        : t("auth.accountTypes.player");
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
   };
 
-  const showLanguagePicker = () => {
-    Alert.alert(t("settings.language.select"), "", [
-      {
-        text: t("settings.language.pt"),
-        onPress: () => changeLanguage("pt"),
-      },
-      {
-        text: t("settings.language.en"),
-        onPress: () => changeLanguage("en"),
-      },
-      {
-        text: t("settings.language.es"),
-        onPress: () => changeLanguage("es"),
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
   const handleLogout = () => {
-    Alert.alert(t("settings.security.logout"), "", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/login");
-        },
-      },
-    ]);
+    setConfirmAction("logout");
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      t("settings.privacy.deleteAccount"),
-      t("settings.privacy.deleteConfirm"),
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteAccount({ sessionUserId: user?.id as any });
-              await logout();
-              router.replace("/login");
-            } catch {
-              Alert.alert("Error", "Failed to delete account");
-            }
-          },
-        },
-      ],
-    );
+    setConfirmAction("deleteAccount");
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction || !user) return;
+
+    setConfirmLoading(true);
+    try {
+      if (confirmAction === "deleteAccount") {
+        await deleteAccount({ sessionUserId: user.id as any });
+      }
+      await logout();
+      setConfirmAction(null);
+      setSettingsModalVisible(false);
+      router.replace("/login");
+    } catch {
+      Alert.alert("Error", confirmAction === "deleteAccount" ? "Failed to delete account" : "Failed to logout");
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const resetPasswordForm = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+  };
+
+  const handleChangePassword = async () => {
+    if (!user) return;
+    if (newPassword.length < 8) {
+      Alert.alert("Error", t("validation.passwordMinLength"));
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert("Error", t("validation.passwordsNotMatch"));
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await changePasswordMutation({
+        sessionUserId: user.id as any,
+        currentPassword,
+        newPassword,
+      });
+      setPasswordModalVisible(false);
+      resetPasswordForm();
+      Alert.alert(t("common.success"), t("settings.security.changePassword"));
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to change password",
+      );
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const handleEditProfile = async () => {
+    const validationError =
+      requiredText(editName, "Name") || optionalText(editBio, "Bio");
+    if (validationError) {
+      Alert.alert("Error", validationError);
+      return;
+    }
+
     try {
       await updateUser({
         sessionUserId: user?.id as any,
-        name: editName,
-        bio: editBio,
+        name: editName.trim(),
+        bio: editBio.trim(),
       });
       setEditModalVisible(false);
       Alert.alert("Success", "Profile updated");
@@ -218,19 +252,33 @@ export default function Profile() {
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1, paddingTop: 50 }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View style={styles.profileSection}>
-          <View style={styles.userInfoRow}>
-            <Image
-              source={{
-                uri:
-                  user?.profileImageBase64 ||
-                  user?.avatar_url ||
-                  "https://placehold.co/150x150",
-              }}
-              style={styles.avatar}
-            />
-            <Text style={[styles.usernameText, { color: colors.text }]}>
-              {user?.fullName || "User"}
-            </Text>
+          <View style={styles.profileHeader}>
+            <View style={styles.userInfoRow}>
+              <Image
+                source={{
+                  uri:
+                    user?.profileImageBase64 ||
+                    user?.avatar_url ||
+                    "https://placehold.co/150x150",
+                }}
+                style={styles.avatar}
+              />
+              <View style={styles.userTitleColumn}>
+                <Text style={[styles.usernameText, { color: colors.text }]}>
+                  {user?.fullName || "User"}
+                </Text>
+                <Text style={[styles.accountTypeSubtitle, { color: colors.textMuted }]}>
+                  Tipo de conta: {accountTypeLabel}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+              onPress={() => setSettingsModalVisible(true)}
+            >
+              <Ionicons name="settings" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
 
           {user?.bio ? (
@@ -313,13 +361,6 @@ export default function Profile() {
           </View>
         ) : null}
       </ScrollView>
-
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={() => setSettingsModalVisible(true)}
-      >
-        <Ionicons name="settings" size={24} color="#fff" />
-      </TouchableOpacity>
 
       <Modal
         visible={discoverModalVisible}
@@ -427,7 +468,7 @@ export default function Profile() {
             <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Settings</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("settings.title")}</Text>
             <View />
           </View>
           <ScrollView style={{ flex: 1, padding: 16, paddingTop: 32 }}>
@@ -440,41 +481,46 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.appearance.title")}
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(t("settings.appearance.theme"), "", [
-                    {
-                      text: t("settings.appearance.light"),
-                      onPress: () => {
-                        if (isDarkMode) toggleDarkMode();
-                      },
-                    },
-                    {
-                      text: t("settings.appearance.dark"),
-                      onPress: () => {
-                        if (!isDarkMode) toggleDarkMode();
-                      },
-                    },
-                    { text: "Cancel", style: "cancel" },
-                  ]);
-                }}
-                style={styles.settingRow}
-              >
+              <View style={styles.settingRow}>
                 <Text style={[styles.settingLabel, { color: colors.text }]}>
                   {t("settings.appearance.theme")}
                 </Text>
-                <View style={styles.selectorChip}>
-                  <Text style={{ color: colors.text }}>
-                    {isDarkMode ? t("settings.appearance.dark") : t("settings.appearance.light")}
-                  </Text>
-                  <Ionicons
-                    name={isDarkMode ? "moon" : "sunny"}
-                    size={20}
-                    color={colors.primary}
-                  />
-                  <Ionicons name="chevron-down" size={16} color={colors.text} />
+                <View style={styles.segmentedControl}>
+                  {[
+                    { label: t("settings.appearance.light"), icon: "sunny" as const, value: false },
+                    { label: t("settings.appearance.dark"), icon: "moon" as const, value: true },
+                  ].map((option) => {
+                    const selected = isDarkMode === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={option.label}
+                        onPress={() => setDarkMode(option.value)}
+                        style={[
+                          styles.segmentButton,
+                          {
+                            backgroundColor: selected ? colors.primary : "transparent",
+                            borderColor: selected ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={option.icon}
+                          size={16}
+                          color={selected ? "#fff" : colors.text}
+                        />
+                        <Text
+                          style={[
+                            styles.segmentText,
+                            { color: selected ? "#fff" : colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              </TouchableOpacity>
+              </View>
             </View>
 
             <View
@@ -486,21 +532,42 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.language.title")}
               </Text>
-              <TouchableOpacity onPress={showLanguagePicker} style={styles.settingRow}>
+              <View style={styles.settingRow}>
                 <Text style={[styles.settingLabel, { color: colors.text }]}>
                   {t("settings.language.select")}
                 </Text>
-                <View style={styles.selectorChip}>
-                  <Text style={{ color: colors.text }}>
-                    {i18n.language === "pt"
-                      ? t("settings.language.pt")
-                      : i18n.language === "en"
-                        ? t("settings.language.en")
-                        : t("settings.language.es")}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={colors.text} />
+                <View style={styles.segmentedControl}>
+                  {[
+                    { label: t("settings.language.pt"), value: "pt" },
+                    { label: t("settings.language.en"), value: "en" },
+                    { label: t("settings.language.es"), value: "es" },
+                  ].map((option) => {
+                    const selected = i18n.language.startsWith(option.value);
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        onPress={() => changeLanguage(option.value)}
+                        style={[
+                          styles.segmentButton,
+                          {
+                            backgroundColor: selected ? colors.primary : "transparent",
+                            borderColor: selected ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.segmentText,
+                            { color: selected ? "#fff" : colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              </TouchableOpacity>
+              </View>
             </View>
 
             <View
@@ -602,7 +669,11 @@ export default function Profile() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.security.title")}
               </Text>
-              <TouchableOpacity style={styles.button} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => setPasswordModalVisible(true)}
+                activeOpacity={0.7}
+              >
                 <Text style={[styles.buttonText, { color: colors.primary }]}>
                   {t("settings.security.changePassword")}
                 </Text>
@@ -631,6 +702,152 @@ export default function Profile() {
             </View>
           </ScrollView>
         </LinearGradient>
+      </Modal>
+
+      <Modal
+        visible={passwordModalVisible}
+        animationType="slide"
+        onRequestClose={() => {
+          setPasswordModalVisible(false);
+          resetPasswordForm();
+        }}
+      >
+        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity
+              onPress={() => {
+                setPasswordModalVisible(false);
+                resetPasswordForm();
+              }}
+            >
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t("settings.security.changePassword")}
+            </Text>
+            <TouchableOpacity onPress={handleChangePassword} disabled={passwordLoading}>
+              {passwordLoading ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Text style={[styles.saveText, { color: colors.primary }]}>
+                  {t("common.save")}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={{ flex: 1, padding: 16 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("auth.password")}
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              placeholder={t("auth.password")}
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+            />
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("settings.security.changePassword")}
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder={t("settings.security.changePassword")}
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+            />
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("auth.confirmPassword")}
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
+              value={confirmNewPassword}
+              onChangeText={setConfirmNewPassword}
+              placeholder={t("auth.confirmPassword")}
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+            />
+          </ScrollView>
+        </LinearGradient>
+      </Modal>
+
+      <Modal
+        visible={confirmAction !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmAction(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View
+            style={[
+              styles.confirmCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>
+              {confirmAction === "deleteAccount"
+                ? t("settings.privacy.deleteAccount")
+                : t("settings.security.logout")}
+            </Text>
+            <Text style={[styles.confirmMessage, { color: colors.textMuted }]}>
+              {confirmAction === "deleteAccount"
+                ? t("settings.privacy.deleteConfirm")
+                : t("settings.security.logout")}
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmButton, { borderColor: colors.border }]}
+                onPress={() => setConfirmAction(null)}
+                disabled={confirmLoading}
+              >
+                <Text style={[styles.confirmButtonText, { color: colors.text }]}>
+                  {t("common.cancel")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, { backgroundColor: colors.danger }]}
+                onPress={handleConfirmAction}
+                disabled={confirmLoading}
+              >
+                {confirmLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.confirmButtonText, { color: "#fff" }]}>
+                    {confirmAction === "deleteAccount"
+                      ? t("settings.privacy.deleteAccount")
+                      : t("settings.security.logout")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -695,37 +912,53 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  floatingButton: {
-    position: "absolute",
-    top: 50,
-    right: 16,
-    backgroundColor: "#007bff",
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
     boxShadow: "0 2px 3.84px rgba(0,0,0,0.25)",
   },
   profileSection: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
     alignItems: "center",
   },
-  userInfoRow: {
+  profileHeader: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 24,
+  },
+  userInfoRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  userTitleColumn: {
+    flex: 1,
+    marginLeft: 16,
+    minWidth: 0,
   },
   usernameText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginLeft: 16,
+    fontSize: 28,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  accountTypeSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
   },
   editButton: {
     paddingHorizontal: 24,
@@ -857,10 +1090,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 16,
+    flexWrap: "wrap",
   },
   settingLabel: {
     fontSize: 16,
     flex: 1,
+    minWidth: 120,
   },
   selectorChip: {
     flexDirection: "row",
@@ -870,6 +1105,29 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.05)",
     borderRadius: 8,
     gap: 8,
+  },
+  segmentedControl: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 8,
+    flex: 2,
+    minWidth: 180,
+  },
+  segmentButton: {
+    minHeight: 38,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   settingDescription: {
     fontSize: 14,
@@ -951,5 +1209,44 @@ const styles = StyleSheet.create({
   resultActionText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  confirmCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 20,
+  },
+  confirmTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  confirmButton: {
+    minHeight: 44,
+    minWidth: 112,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  confirmButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

@@ -1,0 +1,111 @@
+
+> nextapp@1.0.0 web
+> expo start --web --port 8081
+
+env: load .env.local .env
+env: export CONVEX_DEPLOYMENT EXPO_PUBLIC_CONVEX_URL EXPO_PUBLIC_CONVEX_SITE_URL JWT_PRIVATE_KEY
+Starting project at C:\Users\tomas\Desktop\Escola\PAP\nextApp
+React Compiler enabled
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+λ Bundled 2102ms node_modules\expo-router\node\render.js (1240 modules)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.1% (884/970)
+🌐 i18next is made possible by our own product, Locize — consider powering your project with managed localization (AI, CDN, integrations): https://locize.com 💙
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.1% (884/970)
+Web Bundled 4983ms node_modules\expo-router\entry.js (970 modules)
+Web Bundled 1883ms node_modules\expo-router\entry.js (1038 modules)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 49ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 528ms node_modules\expo-router\entry.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 57ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 595ms node_modules\expo-router\entry.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 41ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 474ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 64ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 70ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 649ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 47ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 593ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 93ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 63ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 490ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 39ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 735ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 394ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 753ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 1037ms node_modules\expo-router\node\render.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 203ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 830ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 52ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 408ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 530ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 54ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 749ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 83ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 65ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 631ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 28ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 301ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 69ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 50ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 459ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 1785ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 2357ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 68ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 44ms node_modules\expo-router\node\render.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 395ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 21ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 472ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 91ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 40ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 523ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+λ Bundled 36ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 486ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 55ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 39ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 572ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 38ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 594ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 69ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 52ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 456ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 19ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 707ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 54ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 622ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 867ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 65ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 69ms node_modules\expo-router\node\render.js (1 module)
+Web Bundled 719ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+λ Bundled 43ms node_modules\expo-router\node\render.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 485ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 46ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console

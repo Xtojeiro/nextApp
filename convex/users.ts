@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import { assertPositiveInteger, cleanOptionalText, cleanText } from "./validation";
+import { Scrypt } from "lucia";
 
 const PASSWORD_MIN_LENGTH = 8;
 
@@ -251,12 +253,12 @@ export const updateUser = mutation({
     const updateData: Record<string, any> = {
       updated_at: Date.now(),
     };
-    if (args.name !== undefined) updateData.full_name = sanitizeString(args.name);
-    if (args.bio !== undefined) updateData.bio = sanitizeString(args.bio);
+    if (args.name !== undefined) updateData.full_name = cleanText(args.name, "Name");
+    if (args.bio !== undefined) updateData.bio = cleanOptionalText(args.bio, "Bio");
     if (args.location !== undefined) {
-      updateData.location = sanitizeString(args.location);
+      updateData.location = cleanOptionalText(args.location, "Location", 120);
     }
-    if (args.age !== undefined) updateData.age = args.age;
+    if (args.age !== undefined) updateData.age = assertPositiveInteger(args.age, "Age");
     if (args.gender !== undefined) updateData.gender = args.gender;
     if (args.phoneNumber !== undefined) updateData.push_token = args.phoneNumber;
 
@@ -340,7 +342,7 @@ export const searchUsers = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
-    const sanitizedQuery = sanitizeString(args.query).toLowerCase();
+    const sanitizedQuery = cleanText(args.query, "Search query", 80).toLowerCase();
     const publicUsers = await ctx.db.query("users").collect();
 
     return publicUsers
@@ -406,8 +408,57 @@ export const addAthleteNote = mutation({
     return {
       success: true,
       athleteId: args.athleteId,
-      note: sanitizeString(args.note),
+      note: cleanText(args.note, "Note", 500),
     };
+  },
+});
+
+export const changePassword = mutation({
+  args: {
+    sessionUserId: v.id("users"),
+    currentPassword: v.string(),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
+    if (args.newPassword.length < PASSWORD_MIN_LENGTH) {
+      throw new Error(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    }
+
+    const passwordAccount = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) =>
+        q.eq("userId", user._id).eq("provider", "password"),
+      )
+      .first();
+
+    if (!passwordAccount?.secret) {
+      if (!user.password_hash) {
+        throw new Error("Password account not found");
+      }
+      if (!(await comparePassword(user.password_hash, args.currentPassword))) {
+        throw new Error("Current password is incorrect");
+      }
+    } else {
+      const currentPasswordValid = await new Scrypt().verify(
+        passwordAccount.secret,
+        args.currentPassword,
+      );
+      if (!currentPasswordValid) {
+        throw new Error("Current password is incorrect");
+      }
+
+      await ctx.db.patch(passwordAccount._id, {
+        secret: await new Scrypt().hash(args.newPassword),
+      });
+    }
+
+    await ctx.db.patch(user._id, {
+      password_hash: await hashPassword(args.newPassword),
+      updated_at: Date.now(),
+    });
+
+    return { success: true };
   },
 });
 
@@ -502,6 +553,36 @@ export const deleteAccount = mutation({
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionUserId);
     const userId = user._id;
+
+    const authAccounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
+      .collect();
+    for (const account of authAccounts) {
+      const verificationCodes = await ctx.db
+        .query("authVerificationCodes")
+        .withIndex("accountId", (q) => q.eq("accountId", account._id))
+        .collect();
+      for (const code of verificationCodes) {
+        await ctx.db.delete(code._id);
+      }
+      await ctx.db.delete(account._id);
+    }
+
+    const authSessions = await ctx.db
+      .query("authSessions")
+      .withIndex("userId", (q) => q.eq("userId", userId))
+      .collect();
+    for (const session of authSessions) {
+      const refreshTokens = await ctx.db
+        .query("authRefreshTokens")
+        .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
+        .collect();
+      for (const token of refreshTokens) {
+        await ctx.db.delete(token._id);
+      }
+      await ctx.db.delete(session._id);
+    }
 
     const playerProfile = await ctx.db
       .query("players")

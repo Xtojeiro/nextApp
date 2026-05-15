@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import { assertPositiveInteger, cleanOptionalText, cleanText } from "./validation";
 
 export const getTrainingPlans = query({
   args: {
@@ -75,13 +76,13 @@ export const createTrainingPlan = mutation({
     }
 
     const planId = await ctx.db.insert("trainingPlans", {
-      name: args.name,
-      description: args.description,
+      name: cleanText(args.name, "Plan name"),
+      description: cleanOptionalText(args.description, "Description"),
       coachId: coach._id,
       workouts: [],
-      duration: args.duration,
+      duration: assertPositiveInteger(args.duration, "Duration")!,
       difficulty: args.difficulty,
-      goals: args.goals,
+      goals: args.goals?.map((goal) => cleanText(goal, "Goal", 120)),
       isActive: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -119,11 +120,11 @@ export const updateTrainingPlan = mutation({
     if (plan.coachId !== coach._id) throw new Error("Not authorized to update this plan");
 
     const updateData: Record<string, any> = { updatedAt: Date.now() };
-    if (args.name !== undefined) updateData.name = args.name;
-    if (args.description !== undefined) updateData.description = args.description;
-    if (args.duration !== undefined) updateData.duration = args.duration;
+    if (args.name !== undefined) updateData.name = cleanText(args.name, "Plan name");
+    if (args.description !== undefined) updateData.description = cleanOptionalText(args.description, "Description");
+    if (args.duration !== undefined) updateData.duration = assertPositiveInteger(args.duration, "Duration");
     if (args.difficulty !== undefined) updateData.difficulty = args.difficulty;
-    if (args.goals !== undefined) updateData.goals = args.goals;
+    if (args.goals !== undefined) updateData.goals = args.goals.map((goal) => cleanText(goal, "Goal", 120));
     if (args.isActive !== undefined) updateData.isActive = args.isActive;
 
     await ctx.db.patch(args.id, updateData);

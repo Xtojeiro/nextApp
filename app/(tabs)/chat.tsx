@@ -16,6 +16,7 @@ import {
 import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
+import { requiredText } from "@/utils/formValidation";
 
 export default function ChatTab() {
   const { user } = useAuth();
@@ -66,6 +67,11 @@ export default function ChatTab() {
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedConversation || !user) return;
+    const validationError = requiredText(messageText, "Message", 1000);
+    if (validationError) {
+      Alert.alert("Error", validationError);
+      return;
+    }
 
     try {
       await sendMessage({
@@ -279,14 +285,20 @@ export default function ChatTab() {
   }
 
   return (
-    <LinearGradient
-      colors={colors.gradients.background}
-      style={{ flex: 1, paddingTop: 50 }}
-    >
-      <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+    <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+        <View style={{ padding: 20, paddingBottom: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 28, fontWeight: "700" }}>
+            Mensagens
+          </Text>
+          <Text style={{ color: colors.textMuted, marginTop: 4 }}>
+            Conversas recentes e mensagens da equipa.
+          </Text>
+        </View>
+
+        <FlatList
+          data={conversations}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
           <TouchableOpacity
             style={[
               styles.conversationItem,
@@ -339,12 +351,12 @@ export default function ChatTab() {
               </View>
             </View>
           </TouchableOpacity>
-        )}
-        style={styles.list}
-      />
-      <TouchableOpacity style={styles.floatingButton} onPress={handleNewChat}>
-        <Ionicons name="create-outline" size={24} color="#fff" />
-      </TouchableOpacity>
+          )}
+          style={styles.list}
+        />
+        <TouchableOpacity style={styles.floatingButton} onPress={handleNewChat}>
+          <Ionicons name="create-outline" size={24} color="#fff" />
+        </TouchableOpacity>
 
       {/* New Chat Modal */}
       <Modal

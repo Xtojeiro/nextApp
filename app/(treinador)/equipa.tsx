@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { optionalText, requiredText } from "@/utils/formValidation";
 import {
   Alert,
   FlatList,
@@ -67,8 +68,11 @@ export default function TreinadorEquipa() {
   const removeAthlete = useMutation(api.teams.removeAthleteFromTeam as any);
 
   const handleCreateTeam = async () => {
-    if (!teamName.trim()) {
-      Alert.alert("Error", "Team name is required");
+    const validationError =
+      requiredText(teamName, "Team name") ||
+      optionalText(teamDescription, "Description");
+    if (validationError) {
+      Alert.alert("Error", validationError);
       return;
     }
     try {
@@ -155,7 +159,7 @@ export default function TreinadorEquipa() {
     return (
       <LinearGradient colors={colors.gradients.background as any} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
-          <View style={[styles.header, { backgroundColor: colors.surface }]}>
+          <View style={styles.header}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Minha Equipa</Text>
           </View>
           <EmptyState
@@ -215,7 +219,7 @@ export default function TreinadorEquipa() {
     <LinearGradient colors={colors.gradients.background as any} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Minha Equipa</Text>
           <TouchableOpacity onPress={() => setCreateModalVisible(true)}>
             <Ionicons name="add-circle" size={28} color={colors.primary} />
@@ -373,13 +377,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50,
+    padding: 20,
+    paddingBottom: 12,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "700",
   },
   teamInfo: {
     margin: 16,

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
+import { requiredText } from "@/utils/formValidation";
 import {
   Alert,
   FlatList,
@@ -79,8 +80,9 @@ export default function Equipa() {
   };
 
   const handleSaveNote = async () => {
-    if (!convexUser || !selectedAthlete?.user?._id || !note.trim()) {
-      Alert.alert("Erro", "Escreve uma nota antes de guardar.");
+    const validationError = requiredText(note, "Nota", 500);
+    if (!convexUser || !selectedAthlete?.user?._id || validationError) {
+      Alert.alert("Erro", validationError || "Seleciona um atleta antes de guardar.");
       return;
     }
 

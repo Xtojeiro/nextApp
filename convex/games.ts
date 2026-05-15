@@ -1,6 +1,12 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import {
+  assertFutureTimestamp,
+  assertNonNegativeInteger,
+  cleanOptionalText,
+  cleanText,
+} from "./validation";
 
 export const getGames = query({
   args: {
@@ -80,16 +86,17 @@ export const createGame = mutation({
     if (args.team1Id === args.team2Id) {
       throw new Error("Teams must be different");
     }
+    assertFutureTimestamp(args.date, "Game date");
 
     const now = Date.now();
     const gameId = await ctx.db.insert("games", {
-      name: args.name,
+      name: cleanText(args.name, "Game name"),
       team1Id: args.team1Id,
       team2Id: args.team2Id,
       date: args.date,
-      location: args.location,
+      location: cleanText(args.location, "Location", 120),
       status: "scheduled",
-      notes: args.notes,
+      notes: cleanOptionalText(args.notes, "Notes"),
       createdBy: user._id,
       createdAt: now,
       updatedAt: now,
@@ -137,12 +144,18 @@ export const updateGame = mutation({
       throw new Error("Not authorized to update this game");
     }
 
+    const targetDate = args.date ?? game.date;
+    const targetStatus = args.status ?? game.status;
+    if (targetStatus === "scheduled" || targetStatus === "in_progress") {
+      assertFutureTimestamp(targetDate, "Game date");
+    }
+
     const updateData: Record<string, any> = { updatedAt: Date.now() };
     if (args.status !== undefined) updateData.status = args.status;
-    if (args.score1 !== undefined) updateData.score1 = args.score1;
-    if (args.score2 !== undefined) updateData.score2 = args.score2;
-    if (args.notes !== undefined) updateData.notes = args.notes;
-    if (args.location !== undefined) updateData.location = args.location;
+    if (args.score1 !== undefined) updateData.score1 = assertNonNegativeInteger(args.score1, "Score 1");
+    if (args.score2 !== undefined) updateData.score2 = assertNonNegativeInteger(args.score2, "Score 2");
+    if (args.notes !== undefined) updateData.notes = cleanOptionalText(args.notes, "Notes");
+    if (args.location !== undefined) updateData.location = cleanText(args.location, "Location", 120);
     if (args.date !== undefined) updateData.date = args.date;
 
     await ctx.db.patch(args.gameId, updateData);

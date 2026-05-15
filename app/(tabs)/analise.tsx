@@ -199,14 +199,13 @@ export default function Analise() {
             <Text
               style={{
                 fontSize: 28,
-                fontWeight: "bold",
+                fontWeight: "700",
                 color: colors.text,
-                marginBottom: 8,
               }}
             >
               Análise de Desempenho
             </Text>
-            <Text style={{ color: colors.textMuted }}>
+            <Text style={{ color: colors.textMuted, marginTop: 4 }}>
               Visão comparativa do progresso dos atletas
             </Text>
           </View>

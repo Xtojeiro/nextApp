@@ -1,12 +1,20 @@
 import { api } from "@/utils/apiClient";
 import type { Id } from "@/utils/apiTypes";
 import CoachDashboard from "@/components/CoachDashboard";
+import { DateField, FormErrorText, TimeField } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Picker } from "@react-native-picker/picker";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
+import {
+  eventDateTimeErrors,
+  optionalText,
+  parseEventDateTime,
+  requiredText,
+  ValidationErrors,
+} from "@/utils/formValidation";
 import {
   Alert,
   Modal,
@@ -30,6 +38,8 @@ type EventFormState = {
   location: string;
   notes: string;
 };
+
+type EventFormField = keyof EventFormState | "schedule";
 
 const emptyEventForm: EventFormState = {
   title: "",
@@ -56,6 +66,7 @@ function EventModal({
 }) {
   const { colors } = useTheme();
   const [form, setForm] = useState<EventFormState>(emptyEventForm);
+  const [errors, setErrors] = useState<ValidationErrors<EventFormField>>({});
 
   useEffect(() => {
     if (!visible) return;
@@ -68,7 +79,56 @@ function EventModal({
       location: event?.location || "",
       notes: event?.notes || "",
     });
+    setErrors({});
   }, [event, visible]);
+
+  const setField = (field: keyof EventFormState, value: string | EventType) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined, schedule: undefined }));
+  };
+
+  const validateAndSave = () => {
+    const nextErrors: ValidationErrors<EventFormField> = {};
+    const originalStart = event
+      ? parseEventDateTime(event.date, event.start_time)
+      : null;
+    const allowHistoricalEdit = Boolean(
+      event && originalStart && originalStart.getTime() < Date.now(),
+    );
+
+    nextErrors.title = requiredText(form.title, "Título");
+    nextErrors.location = optionalText(form.location, "Local", 120);
+    nextErrors.notes = optionalText(form.notes, "Notas");
+
+    if (!form.date) nextErrors.date = "Data é obrigatória.";
+    if (!form.start_time) nextErrors.start_time = "Hora de início é obrigatória.";
+    if (!form.end_time) nextErrors.end_time = "Hora de fim é obrigatória.";
+
+    if (form.date && form.start_time && form.end_time) {
+      if (allowHistoricalEdit) {
+        const start = parseEventDateTime(form.date, form.start_time);
+        const end = parseEventDateTime(form.date, form.end_time);
+        if (!start || !end) nextErrors.schedule = "A data e as horas têm de ser válidas.";
+        else if (end.getTime() <= start.getTime()) {
+          nextErrors.schedule = "A hora de fim tem de ser posterior à hora de início.";
+        }
+      } else {
+        nextErrors.schedule = eventDateTimeErrors(
+          form.date,
+          form.start_time,
+          form.end_time,
+        );
+      }
+    }
+
+    Object.keys(nextErrors).forEach((key) => {
+      if (!nextErrors[key as EventFormField]) delete nextErrors[key as EventFormField];
+    });
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    onSave(form);
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -86,34 +146,46 @@ function EventModal({
           </Text>
           <TextInput
             value={form.title}
-            onChangeText={(text) => setForm((current) => ({ ...current, title: text }))}
+            onChangeText={(text) => setField("title", text)}
             placeholder="Título"
             placeholderTextColor={colors.textMuted}
-            style={eventInput(colors)}
+            style={[
+              eventInput(colors),
+              errors.title && { borderColor: colors.danger, borderWidth: 1 },
+            ]}
           />
-          <TextInput
+          <FormErrorText error={errors.title} />
+          <DateField
+            label="Data"
             value={form.date}
-            onChangeText={(text) => setForm((current) => ({ ...current, date: text }))}
-            placeholder="Data (YYYY-MM-DD)"
-            placeholderTextColor={colors.textMuted}
-            style={eventInput(colors)}
+            onChange={(value) => setField("date", value)}
+            placeholder="Selecionar data"
+            error={errors.date}
+            minimumDate={event ? undefined : new Date()}
           />
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <TextInput
-              value={form.start_time}
-              onChangeText={(text) => setForm((current) => ({ ...current, start_time: text }))}
-              placeholder="Início HH:MM"
-              placeholderTextColor={colors.textMuted}
-              style={[eventInput(colors), { flex: 1 }]}
-            />
-            <TextInput
-              value={form.end_time}
-              onChangeText={(text) => setForm((current) => ({ ...current, end_time: text }))}
-              placeholder="Fim HH:MM"
-              placeholderTextColor={colors.textMuted}
-              style={[eventInput(colors), { flex: 1 }]}
-            />
+            <View style={{ flex: 1 }}>
+              <TimeField
+                label="Início"
+                value={form.start_time}
+                onChange={(value) => setField("start_time", value)}
+                placeholder="Selecionar"
+                error={errors.start_time}
+                referenceDate={form.date}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TimeField
+                label="Fim"
+                value={form.end_time}
+                onChange={(value) => setField("end_time", value)}
+                placeholder="Selecionar"
+                error={errors.end_time}
+                referenceDate={form.date}
+              />
+            </View>
           </View>
+          <FormErrorText error={errors.schedule} />
           <View
             style={{
               backgroundColor: colors.surface,
@@ -125,7 +197,7 @@ function EventModal({
             <Picker
               selectedValue={form.type}
               onValueChange={(value) =>
-                setForm((current) => ({ ...current, type: value as EventType }))
+                setField("type", value as EventType)
               }
               style={{ color: colors.text }}
             >
@@ -137,19 +209,28 @@ function EventModal({
           </View>
           <TextInput
             value={form.location}
-            onChangeText={(text) => setForm((current) => ({ ...current, location: text }))}
+            onChangeText={(text) => setField("location", text)}
             placeholder="Local"
             placeholderTextColor={colors.textMuted}
-            style={eventInput(colors)}
+            style={[
+              eventInput(colors),
+              errors.location && { borderColor: colors.danger, borderWidth: 1 },
+            ]}
           />
+          <FormErrorText error={errors.location} />
           <TextInput
             value={form.notes}
-            onChangeText={(text) => setForm((current) => ({ ...current, notes: text }))}
+            onChangeText={(text) => setField("notes", text)}
             placeholder="Notas"
             placeholderTextColor={colors.textMuted}
             multiline
-            style={[eventInput(colors), { height: 100, textAlignVertical: "top" }]}
+            style={[
+              eventInput(colors),
+              { height: 100, textAlignVertical: "top" },
+              errors.notes && { borderColor: colors.danger, borderWidth: 1 },
+            ]}
           />
+          <FormErrorText error={errors.notes} />
 
           <View style={{ flexDirection: "row", gap: 10 }}>
             <TouchableOpacity
@@ -172,7 +253,7 @@ function EventModal({
                 borderRadius: 12,
                 alignItems: "center",
               }}
-              onPress={() => onSave(form)}
+              onPress={validateAndSave}
             >
               <Text style={{ color: "white", fontWeight: "700" }}>Guardar</Text>
             </TouchableOpacity>

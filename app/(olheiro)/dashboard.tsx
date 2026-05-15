@@ -22,10 +22,10 @@ export default function OlheiroDashboard() {
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1, padding: 20 }}>
-          <Text style={{ fontSize: 28, fontWeight: "bold", color: colors.text, marginBottom: 24 }}>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: colors.text }}>
             Painel Olheiro
           </Text>
-          <Text style={{ color: colors.textMuted }}>
+          <Text style={{ color: colors.textMuted, marginTop: 4, marginBottom: 24 }}>
             Bem-vindo ao seu painel de controlo como Olheiro.
           </Text>
         </ScrollView>

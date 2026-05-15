@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import { cleanText } from "./validation";
 
 export const getConversations = query({
   args: {
@@ -136,6 +137,7 @@ export const sendMessage = mutation({
   },
   handler: async (ctx, args) => {
     const sender = await requireSessionUser(ctx, args.sessionUserId);
+    const content = cleanText(args.content, "Message", 1000);
     let conversationId = args.conversationId;
 
     if (!conversationId) {
@@ -157,7 +159,7 @@ export const sendMessage = mutation({
         (await ctx.db.insert("conversations", {
           user_one_id: sender._id,
           user_two_id: args.recipientId,
-          last_message: args.content,
+          last_message: content,
           last_message_at: Date.now(),
           created_at: Date.now(),
           updated_at: Date.now(),
@@ -177,13 +179,13 @@ export const sendMessage = mutation({
     const messageId = await ctx.db.insert("messages", {
       conversation_id: conversationId,
       sender_id: sender._id,
-      content: args.content,
+      content,
       created_at: timestamp,
       is_read: true,
     });
 
     await ctx.db.patch(conversationId, {
-      last_message: args.content,
+      last_message: content,
       last_message_at: timestamp,
       updated_at: timestamp,
     });
@@ -373,7 +375,7 @@ export const searchUsersToMessage = query({
       .withIndex("by_blockerId", (q) => q.eq("blockerId", currentUser._id))
       .collect();
     const blockedIds = new Set(blockedRelations.map((relation) => relation.blockedId));
-    const searchLower = args.searchQuery.toLowerCase();
+    const searchLower = cleanText(args.searchQuery, "Search query", 80).toLowerCase();
     const allUsers = await ctx.db.query("users").collect();
 
     return allUsers

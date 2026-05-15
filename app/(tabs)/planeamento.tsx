@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
+import { optionalText, positiveInteger, requiredText } from "@/utils/formValidation";
 import {
   Alert,
   FlatList,
@@ -104,6 +105,16 @@ export default function Planeamento() {
     const duration = Number(form.duration);
     if (!Number.isFinite(duration) || duration <= 0) {
       Alert.alert("Erro", "A duração tem de ser um número válido.");
+      return;
+    }
+
+    const validationError =
+      requiredText(form.name, "Nome") ||
+      positiveInteger(form.duration, "Duração", true) ||
+      optionalText(form.description, "Descrição") ||
+      optionalText(form.goals, "Objetivos");
+    if (validationError) {
+      Alert.alert("Erro", validationError);
       return;
     }
 

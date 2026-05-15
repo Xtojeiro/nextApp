@@ -32,6 +32,16 @@
       "deleteConfirm": "Are you sure you want to delete your account? This action is irreversible."
     }
   },
+  "welcome": {
+    "kicker": "NextApp Sports",
+    "title": "Your team, always connected",
+    "subtitle": "Track training, games, stats, and communication between players, coaches, and scouts in one place.",
+    "training": "Organize training and track progress",
+    "analytics": "Review stats and performance",
+    "teams": "Connect players, teams, and scouts",
+    "login": "Sign in",
+    "register": "Create account"
+  },
   "auth": {
     "login": {
       "title": "Welcome Back",

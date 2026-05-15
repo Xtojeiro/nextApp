@@ -158,7 +158,7 @@ export default function Rankings() {
     <LinearGradient colors={colors.gradients.background as [string, string]} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Rankings
           </Text>
@@ -215,13 +215,12 @@ export default function Rankings() {
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: 50,
+    padding: 20,
+    paddingBottom: 12,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   headerSubtitle: {
     fontSize: 14,

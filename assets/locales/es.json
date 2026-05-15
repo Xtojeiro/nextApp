@@ -32,6 +32,16 @@
       "deleteConfirm": "¿Estás seguro de que quieres eliminar tu cuenta? Esta acción es irreversible."
     }
   },
+  "welcome": {
+    "kicker": "NextApp Sports",
+    "title": "Tu equipo siempre conectado",
+    "subtitle": "Sigue entrenamientos, partidos, estadisticas y comunicacion entre jugadores, entrenadores y ojeadores en un solo lugar.",
+    "training": "Organiza entrenamientos y progreso",
+    "analytics": "Consulta estadisticas y rendimiento",
+    "teams": "Conecta jugadores, equipos y ojeadores",
+    "login": "Iniciar sesion",
+    "register": "Crear cuenta"
+  },
   "auth": {
     "login": {
       "title": "Bienvenido de Vuelta",

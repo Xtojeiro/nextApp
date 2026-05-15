@@ -29,6 +29,7 @@ import type * as seasons from "../seasons.js";
 import type * as teams from "../teams.js";
 import type * as trainingPlans from "../trainingPlans.js";
 import type * as users from "../users.js";
+import type * as validation from "../validation.js";
 import type * as workouts from "../workouts.js";
 
 import type {
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   teams: typeof teams;
   trainingPlans: typeof trainingPlans;
   users: typeof users;
+  validation: typeof validation;
   workouts: typeof workouts;
 }>;
 

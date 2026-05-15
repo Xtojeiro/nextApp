@@ -1,14 +1,12 @@
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
-  Modal,
-  TextInput,
 } from "react-native";
 
 interface CalendarEvent {
@@ -39,7 +37,6 @@ export default function UnifiedCalendar({
   const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showAddModal, setShowAddModal] = useState(false);
 
   const allItems = [...events, ...games].sort(
     (a, b) => new Date(a.date + "T" + a.start_time).getTime() - new Date(b.date + "T" + b.start_time).getTime()
@@ -227,42 +224,9 @@ export default function UnifiedCalendar({
           )}
         </View>
       )}
-
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {t("dashboard.addEvent")}
-            </Text>
-            <TextInput
-              placeholder={t("dashboard.eventDetails")}
-              style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-              placeholderTextColor={colors.textMuted}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                onPress={() => setShowAddModal(false)}
-                style={[styles.modalButton, { backgroundColor: colors.danger }]}
-              >
-                <Text style={styles.modalButtonText}>{t("common.cancel")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowAddModal(false);
-                }}
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.modalButtonText}>{t("dashboard.create")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
-
-import { useState } from "react";
 
 const styles = StyleSheet.create({
   container: {

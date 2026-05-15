@@ -32,6 +32,16 @@
       "deleteConfirm": "Tem certeza que deseja apagar a sua conta? Esta ação é irreversível."
     }
   },
+  "welcome": {
+    "kicker": "NextApp Sports",
+    "title": "A tua equipa sempre ligada",
+    "subtitle": "Acompanha treinos, jogos, estatisticas e comunicacao entre jogadores, treinadores e olheiros num unico lugar.",
+    "training": "Organiza treinos e acompanha evolucao",
+    "analytics": "Consulta estatisticas e desempenho",
+    "teams": "Liga jogadores, equipas e olheiros",
+    "login": "Entrar",
+    "register": "Criar conta"
+  },
   "auth": {
     "login": {
       "title": "Bem-vindo de Volta",

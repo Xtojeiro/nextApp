@@ -1,8 +1,8 @@
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -26,6 +26,7 @@ export default function Login() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const { login, register, authError, clearAuthError } = useAuth();
 
   const [fullName, setFullName] = useState("");
@@ -43,6 +44,12 @@ export default function Login() {
     confirmPassword?: string;
   }>({});
   const [showSignUp, setShowSignUp] = useState(false);
+
+  useEffect(() => {
+    setShowSignUp(mode === "register");
+    setErrors({});
+    clearAuthError();
+  }, [clearAuthError, mode]);
 
   const clearFieldError = (field: keyof typeof errors) => {
     if (errors[field]) {

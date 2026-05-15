@@ -1,11 +1,19 @@
 import { api } from "@/utils/apiClient";
 import type { Doc, Id } from "@/utils/apiTypes";
+import { DateTimeField, FormErrorText } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
+import {
+  futureDateTime,
+  optionalText,
+  positiveInteger,
+  requiredText,
+  ValidationErrors,
+} from "@/utils/formValidation";
 import {
   Alert,
   FlatList,
@@ -25,8 +33,10 @@ const emptyWorkoutForm = {
   description: "",
   duration: "",
   difficulty: "beginner" as "beginner" | "intermediate" | "advanced",
-  scheduledDate: "",
+  scheduledDate: null as number | null,
 };
+
+type WorkoutField = keyof typeof emptyWorkoutForm;
 
 export default function Treinos() {
   const { colors } = useTheme();
@@ -45,6 +55,7 @@ export default function Treinos() {
   const [timer, setTimer] = useState(0);
   const [completionNotes, setCompletionNotes] = useState("");
   const [form, setForm] = useState(emptyWorkoutForm);
+  const [errors, setErrors] = useState<ValidationErrors<WorkoutField>>({});
 
   useEffect(() => {
     if (!activeWorkout) return;
@@ -62,6 +73,7 @@ export default function Treinos() {
   const resetCreateModal = () => {
     setShowCreateModal(false);
     setForm(emptyWorkoutForm);
+    setErrors({});
   };
 
   const getStatusLabel = (status: Workout["status"]) => {
@@ -92,28 +104,21 @@ export default function Treinos() {
 
   const handleCreateWorkout = async () => {
     if (!user) return;
-    if (!form.name.trim()) {
-      Alert.alert("Erro", "O nome do treino é obrigatório.");
-      return;
-    }
+    const nextErrors: ValidationErrors<WorkoutField> = {
+      name: requiredText(form.name, "Nome"),
+      description: optionalText(form.description, "Descrição"),
+      duration: positiveInteger(form.duration, "Duração"),
+      scheduledDate: form.scheduledDate
+        ? futureDateTime(form.scheduledDate, "Data agendada")
+        : undefined,
+    };
+    Object.keys(nextErrors).forEach((key) => {
+      if (!nextErrors[key as WorkoutField]) delete nextErrors[key as WorkoutField];
+    });
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
     const durationValue = form.duration ? Number(form.duration) : undefined;
-    if (
-      form.duration &&
-      (durationValue === undefined || !Number.isFinite(durationValue) || durationValue <= 0)
-    ) {
-      Alert.alert("Erro", "A duração tem de ser um número válido.");
-      return;
-    }
-
-    const scheduledDate = form.scheduledDate
-      ? new Date(form.scheduledDate).getTime()
-      : undefined;
-
-    if (form.scheduledDate && Number.isNaN(scheduledDate)) {
-      Alert.alert("Erro", "A data agendada não é válida.");
-      return;
-    }
 
     try {
       await createWorkout({
@@ -121,7 +126,7 @@ export default function Treinos() {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         exercises: [],
-        scheduledDate,
+        scheduledDate: form.scheduledDate || undefined,
         duration: durationValue,
         difficulty: form.difficulty,
       });
@@ -368,33 +373,59 @@ export default function Treinos() {
 
               <TextInput
                 value={form.name}
-                onChangeText={(text) => setForm((current) => ({ ...current, name: text }))}
+                onChangeText={(text) => {
+                  setForm((current) => ({ ...current, name: text }));
+                  setErrors((current) => ({ ...current, name: undefined }));
+                }}
                 placeholder="Nome"
                 placeholderTextColor={colors.textMuted}
-                style={workoutInputStyle(colors)}
+                style={[
+                  workoutInputStyle(colors),
+                  errors.name && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
+              <FormErrorText error={errors.name} />
               <TextInput
                 value={form.description}
-                onChangeText={(text) => setForm((current) => ({ ...current, description: text }))}
+                onChangeText={(text) => {
+                  setForm((current) => ({ ...current, description: text }));
+                  setErrors((current) => ({ ...current, description: undefined }));
+                }}
                 placeholder="Descrição"
                 placeholderTextColor={colors.textMuted}
                 multiline
-                style={[workoutInputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+                style={[
+                  workoutInputStyle(colors),
+                  { height: 100, textAlignVertical: "top" },
+                  errors.description && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
+              <FormErrorText error={errors.description} />
               <TextInput
                 value={form.duration}
-                onChangeText={(text) => setForm((current) => ({ ...current, duration: text }))}
+                onChangeText={(text) => {
+                  setForm((current) => ({ ...current, duration: text }));
+                  setErrors((current) => ({ ...current, duration: undefined }));
+                }}
                 placeholder="Duração em minutos"
                 placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
-                style={workoutInputStyle(colors)}
+                style={[
+                  workoutInputStyle(colors),
+                  errors.duration && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
-              <TextInput
+              <FormErrorText error={errors.duration} />
+              <DateTimeField
+                label="Agendar para"
                 value={form.scheduledDate}
-                onChangeText={(text) => setForm((current) => ({ ...current, scheduledDate: text }))}
-                placeholder="Agendar para (opcional, ex: 2026-04-22T18:00)"
-                placeholderTextColor={colors.textMuted}
-                style={workoutInputStyle(colors)}
+                onChange={(value) => {
+                  setForm((current) => ({ ...current, scheduledDate: value }));
+                  setErrors((current) => ({ ...current, scheduledDate: undefined }));
+                }}
+                placeholder="Selecionar data e hora opcional"
+                error={errors.scheduledDate}
+                minimumDate={new Date()}
               />
 
               <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>

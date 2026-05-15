@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import {
+  assertEventSchedule,
+  cleanOptionalText,
+  cleanText,
+  parseEventDateTime,
+} from "./validation";
 
 export const getEvents = query({
   args: {
@@ -53,16 +59,17 @@ export const createEvent = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionUserId);
+    assertEventSchedule(args.date, args.start_time, args.end_time);
     const eventId = await ctx.db.insert("events", {
-      title: args.title,
-      description: args.description,
+      title: cleanText(args.title, "Title"),
+      description: cleanOptionalText(args.description, "Description"),
       date: args.date,
       start_time: args.start_time,
       end_time: args.end_time,
-      location: args.location,
+      location: cleanOptionalText(args.location, "Location", 120),
       type: args.type,
       user_id: user._id,
-      notes: args.notes,
+      notes: cleanOptionalText(args.notes, "Notes"),
       created_at: Date.now(),
     });
 
@@ -96,15 +103,23 @@ export const updateEvent = mutation({
     if (!event) throw new Error("Event not found");
     if (event.user_id !== user._id) throw new Error("Not authorized to update this event");
 
+    const nextDate = args.date ?? event.date;
+    const nextStartTime = args.start_time ?? event.start_time;
+    const nextEndTime = args.end_time ?? event.end_time;
+    const originalStart = parseEventDateTime(event.date, event.start_time);
+    assertEventSchedule(nextDate, nextStartTime, nextEndTime, {
+      allowPast: originalStart.getTime() < Date.now(),
+    });
+
     const updateData: Record<string, any> = {};
-    if (args.title !== undefined) updateData.title = args.title;
-    if (args.description !== undefined) updateData.description = args.description;
+    if (args.title !== undefined) updateData.title = cleanText(args.title, "Title");
+    if (args.description !== undefined) updateData.description = cleanOptionalText(args.description, "Description");
     if (args.date !== undefined) updateData.date = args.date;
     if (args.start_time !== undefined) updateData.start_time = args.start_time;
     if (args.end_time !== undefined) updateData.end_time = args.end_time;
-    if (args.location !== undefined) updateData.location = args.location;
+    if (args.location !== undefined) updateData.location = cleanOptionalText(args.location, "Location", 120);
     if (args.type !== undefined) updateData.type = args.type;
-    if (args.notes !== undefined) updateData.notes = args.notes;
+    if (args.notes !== undefined) updateData.notes = cleanOptionalText(args.notes, "Notes");
 
     await ctx.db.patch(args.id, updateData);
     return { success: true };

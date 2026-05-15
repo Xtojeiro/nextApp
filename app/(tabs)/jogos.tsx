@@ -1,11 +1,19 @@
 import { api } from "@/utils/apiClient";
 import type { Doc, Id } from "@/utils/apiTypes";
+import { DateTimeField, FormErrorText } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
+import {
+  futureDateTime,
+  nonNegativeInteger,
+  optionalText,
+  requiredText,
+  ValidationErrors,
+} from "@/utils/formValidation";
 import {
   Alert,
   FlatList,
@@ -29,18 +37,21 @@ const emptyCreateForm = {
   name: "",
   opponentTeamId: "" as string,
   location: "",
-  date: "",
+  date: null as number | null,
   notes: "",
 };
 
 const emptyEditForm = {
   location: "",
-  date: "",
+  date: null as number | null,
   notes: "",
   score1: "",
   score2: "",
   status: "scheduled" as "scheduled" | "in_progress" | "completed" | "cancelled",
 };
+
+type CreateField = keyof typeof emptyCreateForm;
+type EditField = keyof typeof emptyEditForm;
 
 export default function Jogos() {
   const { colors } = useTheme();
@@ -75,6 +86,8 @@ export default function Jogos() {
   const [selectedGame, setSelectedGame] = useState<GameWithTeams | null>(null);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
   const [editForm, setEditForm] = useState(emptyEditForm);
+  const [createErrors, setCreateErrors] = useState<ValidationErrors<CreateField>>({});
+  const [editErrors, setEditErrors] = useState<ValidationErrors<EditField>>({});
 
   const sortedGames = [...games].sort((a, b) => b.date - a.date);
 
@@ -115,11 +128,13 @@ export default function Jogos() {
 
   const resetCreateForm = () => {
     setCreateForm(emptyCreateForm);
+    setCreateErrors({});
     setShowCreateModal(false);
   };
 
   const resetEditForm = () => {
     setEditForm(emptyEditForm);
+    setEditErrors({});
     setSelectedGame(null);
     setShowEditModal(false);
   };
@@ -128,7 +143,7 @@ export default function Jogos() {
     setSelectedGame(game);
     setEditForm({
       location: game.location || "",
-      date: new Date(game.date).toISOString().slice(0, 16),
+      date: game.date,
       notes: game.notes || "",
       score1: game.score1?.toString() || "",
       score2: game.score2?.toString() || "",
@@ -176,16 +191,18 @@ export default function Jogos() {
 
   const handleCreateGame = async () => {
     if (!team || !convexUser) return;
-    if (!createForm.name.trim() || !createForm.location.trim() || !createForm.date || !createForm.opponentTeamId) {
-      Alert.alert("Erro", "Preenche nome, adversário, local e data.");
-      return;
-    }
-
-    const parsedDate = new Date(createForm.date);
-    if (Number.isNaN(parsedDate.getTime())) {
-      Alert.alert("Erro", "A data do jogo não é válida.");
-      return;
-    }
+    const nextErrors: ValidationErrors<CreateField> = {
+      name: requiredText(createForm.name, "Nome do jogo"),
+      location: requiredText(createForm.location, "Local", 120),
+      opponentTeamId: createForm.opponentTeamId ? undefined : "Adversário é obrigatório.",
+      date: futureDateTime(createForm.date, "Data do jogo"),
+      notes: optionalText(createForm.notes, "Notas"),
+    };
+    Object.keys(nextErrors).forEach((key) => {
+      if (!nextErrors[key as CreateField]) delete nextErrors[key as CreateField];
+    });
+    setCreateErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
     try {
       await createGame({
@@ -193,7 +210,7 @@ export default function Jogos() {
         name: createForm.name.trim(),
         team1Id: team._id,
         team2Id: createForm.opponentTeamId as Id<"teams">,
-        date: parsedDate.getTime(),
+        date: createForm.date!,
         location: createForm.location.trim(),
         notes: createForm.notes.trim() || undefined,
       });
@@ -206,8 +223,26 @@ export default function Jogos() {
 
   const handleUpdateGame = async () => {
     if (!selectedGame || !convexUser) return;
+    const shouldRequireFuture =
+      editForm.status === "scheduled" || editForm.status === "in_progress";
+    const nextErrors: ValidationErrors<EditField> = {
+      location: requiredText(editForm.location, "Local", 120),
+      date: shouldRequireFuture
+        ? futureDateTime(editForm.date, "Data do jogo")
+        : editForm.date
+          ? undefined
+          : "Data do jogo é obrigatória.",
+      notes: optionalText(editForm.notes, "Notas"),
+      score1: nonNegativeInteger(editForm.score1, team?.name || "Pontuação da equipa"),
+      score2: nonNegativeInteger(editForm.score2, "Pontuação do adversário"),
+    };
+    Object.keys(nextErrors).forEach((key) => {
+      if (!nextErrors[key as EditField]) delete nextErrors[key as EditField];
+    });
+    setEditErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
-    const parsedDate = new Date(editForm.date);
+    const parsedDate = new Date(editForm.date!);
     if (Number.isNaN(parsedDate.getTime())) {
       Alert.alert("Erro", "A data do jogo não é válida.");
       return;
@@ -218,7 +253,7 @@ export default function Jogos() {
         sessionUserId: convexUser._id,
         gameId: selectedGame._id,
         location: editForm.location.trim() || undefined,
-        date: parsedDate.getTime(),
+        date: editForm.date!,
         notes: editForm.notes.trim() || undefined,
         status: editForm.status,
         score1: editForm.score1 ? Number(editForm.score1) : undefined,
@@ -432,24 +467,42 @@ export default function Jogos() {
 
               <TextInput
                 value={createForm.name}
-                onChangeText={(text) => setCreateForm((current) => ({ ...current, name: text }))}
+                onChangeText={(text) => {
+                  setCreateForm((current) => ({ ...current, name: text }));
+                  setCreateErrors((current) => ({ ...current, name: undefined }));
+                }}
                 placeholder="Nome do jogo"
                 placeholderTextColor={colors.textMuted}
-                style={inputStyle(colors)}
+                style={[
+                  inputStyle(colors),
+                  createErrors.name && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
+              <FormErrorText error={createErrors.name} />
               <TextInput
                 value={createForm.location}
-                onChangeText={(text) => setCreateForm((current) => ({ ...current, location: text }))}
+                onChangeText={(text) => {
+                  setCreateForm((current) => ({ ...current, location: text }));
+                  setCreateErrors((current) => ({ ...current, location: undefined }));
+                }}
                 placeholder="Local"
                 placeholderTextColor={colors.textMuted}
-                style={inputStyle(colors)}
+                style={[
+                  inputStyle(colors),
+                  createErrors.location && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
-              <TextInput
+              <FormErrorText error={createErrors.location} />
+              <DateTimeField
+                label="Data e hora"
                 value={createForm.date}
-                onChangeText={(text) => setCreateForm((current) => ({ ...current, date: text }))}
-                placeholder="Data e hora (ex: 2026-04-22T19:30)"
-                placeholderTextColor={colors.textMuted}
-                style={inputStyle(colors)}
+                onChange={(value) => {
+                  setCreateForm((current) => ({ ...current, date: value }));
+                  setCreateErrors((current) => ({ ...current, date: undefined }));
+                }}
+                placeholder="Selecionar data e hora"
+                error={createErrors.date}
+                minimumDate={new Date()}
               />
               <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
                 Adversário
@@ -483,14 +536,23 @@ export default function Jogos() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <FormErrorText error={createErrors.opponentTeamId} />
               <TextInput
                 value={createForm.notes}
-                onChangeText={(text) => setCreateForm((current) => ({ ...current, notes: text }))}
+                onChangeText={(text) => {
+                  setCreateForm((current) => ({ ...current, notes: text }));
+                  setCreateErrors((current) => ({ ...current, notes: undefined }));
+                }}
                 placeholder="Notas opcionais"
                 placeholderTextColor={colors.textMuted}
                 multiline
-                style={[inputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+                style={[
+                  inputStyle(colors),
+                  { height: 100, textAlignVertical: "top" },
+                  createErrors.notes && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
+              <FormErrorText error={createErrors.notes} />
 
               <TouchableOpacity
                 style={{
@@ -531,17 +593,32 @@ export default function Jogos() {
 
               <TextInput
                 value={editForm.location}
-                onChangeText={(text) => setEditForm((current) => ({ ...current, location: text }))}
+                onChangeText={(text) => {
+                  setEditForm((current) => ({ ...current, location: text }));
+                  setEditErrors((current) => ({ ...current, location: undefined }));
+                }}
                 placeholder="Local"
                 placeholderTextColor={colors.textMuted}
-                style={inputStyle(colors)}
+                style={[
+                  inputStyle(colors),
+                  editErrors.location && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
-              <TextInput
+              <FormErrorText error={editErrors.location} />
+              <DateTimeField
+                label="Data e hora"
                 value={editForm.date}
-                onChangeText={(text) => setEditForm((current) => ({ ...current, date: text }))}
-                placeholder="Data e hora (ex: 2026-04-22T19:30)"
-                placeholderTextColor={colors.textMuted}
-                style={inputStyle(colors)}
+                onChange={(value) => {
+                  setEditForm((current) => ({ ...current, date: value }));
+                  setEditErrors((current) => ({ ...current, date: undefined }));
+                }}
+                placeholder="Selecionar data e hora"
+                error={editErrors.date}
+                minimumDate={
+                  editForm.status === "scheduled" || editForm.status === "in_progress"
+                    ? new Date()
+                    : undefined
+                }
               />
 
               <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
@@ -574,30 +651,53 @@ export default function Jogos() {
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TextInput
                   value={editForm.score1}
-                  onChangeText={(text) => setEditForm((current) => ({ ...current, score1: text }))}
+                  onChangeText={(text) => {
+                    setEditForm((current) => ({ ...current, score1: text }));
+                    setEditErrors((current) => ({ ...current, score1: undefined }));
+                  }}
                   placeholder={team?.name || "Equipa 1"}
                   placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
-                  style={[inputStyle(colors), { flex: 1 }]}
+                  style={[
+                    inputStyle(colors),
+                    { flex: 1 },
+                    editErrors.score1 && { borderColor: colors.danger, borderWidth: 1 },
+                  ]}
                 />
                 <TextInput
                   value={editForm.score2}
-                  onChangeText={(text) => setEditForm((current) => ({ ...current, score2: text }))}
+                  onChangeText={(text) => {
+                    setEditForm((current) => ({ ...current, score2: text }));
+                    setEditErrors((current) => ({ ...current, score2: undefined }));
+                  }}
                   placeholder="Adversário"
                   placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
-                  style={[inputStyle(colors), { flex: 1 }]}
+                  style={[
+                    inputStyle(colors),
+                    { flex: 1 },
+                    editErrors.score2 && { borderColor: colors.danger, borderWidth: 1 },
+                  ]}
                 />
               </View>
+              <FormErrorText error={editErrors.score1 || editErrors.score2} />
 
               <TextInput
                 value={editForm.notes}
-                onChangeText={(text) => setEditForm((current) => ({ ...current, notes: text }))}
+                onChangeText={(text) => {
+                  setEditForm((current) => ({ ...current, notes: text }));
+                  setEditErrors((current) => ({ ...current, notes: undefined }));
+                }}
                 placeholder="Notas"
                 placeholderTextColor={colors.textMuted}
                 multiline
-                style={[inputStyle(colors), { height: 100, textAlignVertical: "top" }]}
+                style={[
+                  inputStyle(colors),
+                  { height: 100, textAlignVertical: "top" },
+                  editErrors.notes && { borderColor: colors.danger, borderWidth: 1 },
+                ]}
               />
+              <FormErrorText error={editErrors.notes} />
 
               <TouchableOpacity
                 style={{

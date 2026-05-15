@@ -1,6 +1,12 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import {
+  assertFutureTimestamp,
+  assertPositiveInteger,
+  cleanOptionalText,
+  cleanText,
+} from "./validation";
 
 export const getWorkoutLogs = query({
   args: {
@@ -79,16 +85,18 @@ export const createWorkout = mutation({
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionUserId);
     const now = Date.now();
+    const scheduledDate = assertFutureTimestamp(args.scheduledDate, "Scheduled date");
+    const duration = assertPositiveInteger(args.duration, "Duration");
     return await ctx.db.insert("workouts", {
       user_id: user._id,
-      name: args.name,
-      description: args.description,
+      name: cleanText(args.name, "Workout name"),
+      description: cleanOptionalText(args.description, "Description"),
       type: "custom",
-      duration_minutes: args.duration,
-      objective: args.description,
-      scheduledDate: args.scheduledDate,
+      duration_minutes: duration,
+      objective: cleanOptionalText(args.description, "Objective"),
+      scheduledDate,
       difficulty: args.difficulty,
-      status: args.scheduledDate ? "scheduled" : "in_progress",
+      status: scheduledDate ? "scheduled" : "in_progress",
       created_at: now,
     });
   },

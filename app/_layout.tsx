@@ -46,13 +46,14 @@ function RootLayoutNav() {
       return;
     }
 
-    if (pathname !== "/login" && pathname !== "/verify") {
-      router.replace("/login");
+    if (pathname !== "/" && pathname !== "/login" && pathname !== "/verify") {
+      router.replace("/");
     }
   }, [accountType, isLoading, pathname, router, user]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="verify" />
       <Stack.Screen name="(tabs)" />

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
+import { cleanOptionalText, cleanText } from "./validation";
 
 export const getTeam = query({
   args: {
@@ -108,8 +109,8 @@ export const createTeam = mutation({
 
     const now = Date.now();
     const teamId = await ctx.db.insert("teams", {
-      name: args.name,
-      description: args.description,
+      name: cleanText(args.name, "Team name"),
+      description: cleanOptionalText(args.description, "Description"),
       coachId: user._id,
       createdAt: now,
       updatedAt: now,
@@ -145,8 +146,8 @@ export const updateTeam = mutation({
     if (team.coachId !== user._id) throw new Error("Not authorized to update this team");
 
     const updateData: Record<string, any> = { updatedAt: Date.now() };
-    if (args.name !== undefined) updateData.name = args.name;
-    if (args.description !== undefined) updateData.description = args.description;
+    if (args.name !== undefined) updateData.name = cleanText(args.name, "Team name");
+    if (args.description !== undefined) updateData.description = cleanOptionalText(args.description, "Description");
     if (args.logo !== undefined) updateData.logo = args.logo;
 
     await ctx.db.patch(args.teamId, updateData);

@@ -21,10 +21,10 @@ export default function OlheiroRelatorios() {
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1, padding: 20 }}>
-          <Text style={{ fontSize: 28, fontWeight: "bold", color: colors.text, marginBottom: 24 }}>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: colors.text }}>
             Meus Relatórios
           </Text>
-          <Text style={{ color: colors.textMuted }}>
+          <Text style={{ color: colors.textMuted, marginTop: 4, marginBottom: 24 }}>
             Gere e visualize relatórios de observação de atletas.
           </Text>
         </ScrollView>
