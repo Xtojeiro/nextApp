@@ -10,7 +10,7 @@
 ## O que o seed cria
 
 - Utilizadores com perfis realistas: treinadores, jogadores, olheiros, contas ativas e inativas
-- Conta demo principal `admin@test.com` para testes
+- Contas demo criadas pelo Convex Auth, por equipa, para testes de login
 - Equipas, relações coach -> team e player -> team
 - Treinos, histórico de treinos e planos de treino
 - Eventos de calendário
@@ -28,11 +28,9 @@
 
 ## Utilizadores de teste
 
-- `admin@test.com` / `password123`
-  Nota: o sistema atual não tem role `ADMIN`. Esta conta demo usa a role `COACH` e está marcada com `tags: ["ADMIN", "DEMO"]`.
-- `coach@test.com` / `password123`
-- `player@test.com` / `password123`
-- `scout@test.com` / `password123`
+- `treinador01@pap.local` / `PAP2026!treinador01`
+- `olheiro01@pap.local` / `PAP2026!olheiro01`
+- `jogador01@pap.local` / `PAP2026!jogador01`
 
 ## Como correr
 

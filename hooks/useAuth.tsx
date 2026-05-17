@@ -71,6 +71,13 @@ function mapConvexUser(convexUser: any): User | null {
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
+    if (
+      error.message.includes("InvalidSecret") ||
+      error.message.includes("InvalidAccountId") ||
+      error.message.includes("AccountNotFound")
+    ) {
+      return "Email ou palavra-passe incorretos.";
+    }
     return error.message;
   }
   return fallback;

@@ -27,7 +27,7 @@ export default function Login() {
   const { t } = useTranslation();
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const { login, register, authError, clearAuthError } = useAuth();
+  const { user, login, register, logout, authError, clearAuthError } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -88,6 +88,9 @@ export default function Login() {
     setIsLoading(true);
     try {
       clearAuthError();
+      if (user) {
+        await logout();
+      }
       const result = showSignUp
         ? await register(fullName.trim(), email.trim(), password, confirmPassword, selectedRole)
         : await login(email.trim(), password);
@@ -125,6 +128,42 @@ export default function Login() {
           </View>
 
           <View style={styles.form}>
+            {user && (
+              <View
+                style={[
+                  styles.sessionContainer,
+                  { borderColor: colors.border, backgroundColor: `${colors.surface}CC` },
+                ]}
+              >
+                <Text style={[styles.sessionTitle, { color: colors.text }]}>
+                  Sessao ativa
+                </Text>
+                <Text style={[styles.sessionText, { color: colors.textMuted }]}>
+                  {user.email}
+                </Text>
+                <View style={styles.sessionActions}>
+                  <TouchableOpacity
+                    style={[styles.sessionButton, { borderColor: colors.border }]}
+                    onPress={() => router.replace("/")}
+                  >
+                    <Text style={[styles.sessionButtonText, { color: colors.text }]}>
+                      Continuar
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sessionButton, { borderColor: colors.danger }]}
+                    onPress={async () => {
+                      await logout();
+                      clearAuthError();
+                    }}
+                  >
+                    <Text style={[styles.sessionButtonText, { color: colors.danger }]}>
+                      Terminar sessao
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
             {authError && (
               <View
                 style={[
@@ -389,6 +428,37 @@ const styles = StyleSheet.create({
   authErrorText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  sessionContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  sessionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  sessionText: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  sessionActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  sessionButton: {
+    flex: 1,
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  sessionButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   button: {
     borderRadius: 12,

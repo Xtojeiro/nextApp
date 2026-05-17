@@ -6,7 +6,7 @@
     "start": "expo start",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
-    "seed:demo": "convex run demo:seedDemo",
+    "seed:demo": "convex run demo:seedLeagueDemoAccounts",
     "export:web": "expo export --platform web",
     "android": "expo run:android",
     "ios": "expo run:ios",

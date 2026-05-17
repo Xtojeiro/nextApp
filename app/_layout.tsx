@@ -40,7 +40,7 @@ function RootLayoutNav() {
     }
 
     if (user) {
-      if (pathname === "/" || pathname === "/login") {
+      if (pathname === "/") {
         router.replace(getHomeRoute(accountType));
       }
       return;
