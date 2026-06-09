@@ -1,7 +1,0 @@
-Repositorio Website:
-
-https://github.com/Xtojeiro/NextWeb
-
-Repositorio Aplicação:
-
-https://github.com/Xtojeiro/nextApp

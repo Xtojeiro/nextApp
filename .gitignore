@@ -43,3 +43,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+/.scannerwork
+token.md
+
+/.codex-run
