@@ -17,7 +17,7 @@ export default function EmptyState({
   subtitle,
   actionLabel,
   onAction,
-}: EmptyStateProps) {
+}: Readonly<EmptyStateProps>) {
   const { colors } = useTheme();
 
   return (

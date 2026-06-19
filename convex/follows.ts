@@ -115,6 +115,10 @@ export const followUser = mutation({
     if (follower._id === args.userId) {
       throw new Error("Cannot follow yourself");
     }
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) {
+      throw new Error("User not found");
+    }
 
     const existingFollow = await ctx.db
       .query("follows")
@@ -126,13 +130,44 @@ export const followUser = mutation({
       throw new Error("Already following this user");
     }
 
+    if (targetUser.is_public === false) {
+      const existingRequest = await ctx.db
+        .query("followRequests")
+        .withIndex("by_requester_id", (q) => q.eq("requester_id", follower._id))
+        .filter((q) => q.eq(q.field("target_id"), args.userId))
+        .filter((q) => q.eq(q.field("status"), "pending"))
+        .first();
+
+      if (existingRequest) {
+        return { success: true, status: "pending" };
+      }
+
+      await ctx.db.insert("followRequests", {
+        requester_id: follower._id,
+        target_id: args.userId,
+        status: "pending",
+        created_at: Date.now(),
+      });
+      await ctx.db.insert("notifications", {
+        userId: args.userId,
+        type: "follow",
+        title: "Novo pedido para seguir",
+        body: `${follower.full_name || follower.name || "Um utilizador"} quer seguir o teu perfil.`,
+        data: JSON.stringify({ requesterId: follower._id }),
+        isRead: false,
+        createdAt: Date.now(),
+      });
+
+      return { success: true, status: "pending" };
+    }
+
     await ctx.db.insert("follows", {
       follower_id: follower._id,
       following_id: args.userId,
       created_at: Date.now(),
     });
 
-    return { success: true };
+    return { success: true, status: "following" };
   },
 });
 
@@ -154,6 +189,93 @@ export const unfollowUser = mutation({
     }
 
     await ctx.db.delete(follow._id);
+    return { success: true };
+  },
+});
+
+export const getPendingFollowRequests = query({
+  args: {
+    sessionUserId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
+    const requests = await ctx.db
+      .query("followRequests")
+      .withIndex("by_target_id", (q) => q.eq("target_id", user._id))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    const enriched = await Promise.all(
+      requests.slice(0, args.limit || 50).map(async (request) => {
+        const requester = await ctx.db.get(request.requester_id);
+        return requester
+          ? {
+              _id: request._id,
+              created_at: request.created_at,
+              requester: {
+                _id: requester._id,
+                full_name: requester.full_name || requester.name || "Utilizador",
+                avatar: requester.avatar,
+                role: requester.role,
+              },
+            }
+          : null;
+      }),
+    );
+
+    return enriched.filter(Boolean);
+  },
+});
+
+export const respondToFollowRequest = mutation({
+  args: {
+    sessionUserId: v.id("users"),
+    requestId: v.id("followRequests"),
+    accept: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
+    const request = await ctx.db.get(args.requestId);
+    if (!request || request.target_id !== user._id) {
+      throw new Error("Follow request not found");
+    }
+    if (request.status !== "pending") {
+      throw new Error("Follow request already answered");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.requestId, {
+      status: args.accept ? "accepted" : "rejected",
+      responded_at: now,
+    });
+
+    if (args.accept) {
+      const existingFollow = await ctx.db
+        .query("follows")
+        .withIndex("by_follower_id", (q) => q.eq("follower_id", request.requester_id))
+        .filter((q) => q.eq(q.field("following_id"), user._id))
+        .first();
+
+      if (!existingFollow) {
+        await ctx.db.insert("follows", {
+          follower_id: request.requester_id,
+          following_id: user._id,
+          created_at: now,
+        });
+      }
+    }
+
+    await ctx.db.insert("notifications", {
+      userId: request.requester_id,
+      type: "follow",
+      title: args.accept ? "Pedido aceite" : "Pedido rejeitado",
+      body: `${user.full_name || user.name || "O utilizador"} ${args.accept ? "aceitou" : "rejeitou"} o teu pedido para seguir.`,
+      data: JSON.stringify({ targetId: user._id }),
+      isRead: false,
+      createdAt: now,
+    });
+
     return { success: true };
   },
 });

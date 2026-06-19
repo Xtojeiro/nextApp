@@ -92,6 +92,16 @@ function parseDateTimeInputValue(value: string) {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+function getMinimumInputValue(
+  type: "date" | "time" | "datetime-local",
+  minimumDate?: Date,
+) {
+  if (!minimumDate) return undefined;
+  if (type === "date") return toDateString(minimumDate);
+  if (type === "datetime-local") return toDateTimeInputValue(minimumDate);
+  return undefined;
+}
+
 function WebInput({
   label,
   type,
@@ -100,11 +110,11 @@ function WebInput({
   error,
   minimumDate,
   onChange,
-}: FieldBaseProps & {
+}: Readonly<FieldBaseProps & {
   type: "date" | "time" | "datetime-local";
   value: string;
   onChange: (value: string) => void;
-}) {
+}>) {
   const { colors } = useTheme();
   return (
     <View>
@@ -115,12 +125,7 @@ function WebInput({
         type,
         value,
         placeholder,
-        min:
-          minimumDate && type === "date"
-            ? toDateString(minimumDate)
-            : minimumDate && type === "datetime-local"
-              ? toDateTimeInputValue(minimumDate)
-              : undefined,
+        min: getMinimumInputValue(type, minimumDate),
         step: type === "time" || type === "datetime-local" ? TIME_STEP_MINUTES * 60 : undefined,
         onChange: (event: { target: { value: string } }) => onChange(event.target.value),
         style: {
@@ -166,10 +171,10 @@ function FieldButton({
   placeholder,
   error,
   onPress,
-}: FieldBaseProps & {
+}: Readonly<Omit<FieldBaseProps, "minimumDate"> & {
   value: string;
   onPress: () => void;
-}) {
+}>) {
   const { colors } = useTheme();
   return (
     <View>
@@ -207,10 +212,10 @@ export function DateTimeField({
   placeholder,
   error,
   minimumDate,
-}: FieldBaseProps & {
+}: Readonly<FieldBaseProps & {
   value: number | null;
   onChange: (value: number) => void;
-}) {
+}>) {
   const [pickerMode, setPickerMode] = useState<"date" | "time" | "datetime" | null>(null);
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const selected = value ? new Date(value) : roundToStep(minimumDate || new Date());
@@ -289,10 +294,10 @@ export function DateField({
   placeholder,
   error,
   minimumDate,
-}: FieldBaseProps & {
+}: Readonly<FieldBaseProps & {
   value: string;
   onChange: (value: string) => void;
-}) {
+}>) {
   const [showPicker, setShowPicker] = useState(false);
 
   if (Platform.OS === "web") {
@@ -342,11 +347,11 @@ export function TimeField({
   placeholder,
   error,
   referenceDate,
-}: FieldBaseProps & {
+}: Readonly<FieldBaseProps & {
   value: string;
   onChange: (value: string) => void;
   referenceDate?: string;
-}) {
+}>) {
   const [showPicker, setShowPicker] = useState(false);
   const parsedReference = parseDateString(referenceDate);
 

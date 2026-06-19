@@ -84,6 +84,7 @@ export default defineSchema({
   // Workouts
   workouts: defineTable({
     user_id: v.id("users"),
+    eventId: v.optional(v.id("events")),
     name: v.string(),
     description: v.optional(v.string()),
     type: v.optional(v.string()),
@@ -102,7 +103,9 @@ export default defineSchema({
       v.literal("skipped"),
     ),
     created_at: v.number(),
-  }).index("by_user_id", ["user_id"]),
+  })
+    .index("by_user_id", ["user_id"])
+    .index("by_eventId", ["eventId"]),
 
   // Workout logs
   workoutLogs: defineTable({
@@ -140,6 +143,29 @@ export default defineSchema({
     ),
     score1: v.optional(v.number()),
     score2: v.optional(v.number()),
+    resultStatus: v.optional(
+      v.union(
+        v.literal("pending_approval"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    ),
+    submittedBy: v.optional(v.id("users")),
+    submittedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
+    approvedAt: v.optional(v.number()),
+    rejectedBy: v.optional(v.id("users")),
+    rejectedAt: v.optional(v.number()),
+    pendingScore1: v.optional(v.number()),
+    pendingScore2: v.optional(v.number()),
+    pendingStatus: v.optional(
+      v.union(
+        v.literal("scheduled"),
+        v.literal("in_progress"),
+        v.literal("completed"),
+        v.literal("cancelled"),
+      ),
+    ),
     notes: v.optional(v.string()),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -228,6 +254,22 @@ export default defineSchema({
   })
     .index("by_follower_id", ["follower_id"])
     .index("by_following_id", ["following_id"]),
+
+  // Follow requests for private profiles
+  followRequests: defineTable({
+    requester_id: v.id("users"),
+    target_id: v.id("users"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("rejected"),
+    ),
+    created_at: v.number(),
+    responded_at: v.optional(v.number()),
+  })
+    .index("by_requester_id", ["requester_id"])
+    .index("by_target_id", ["target_id"])
+    .index("by_status", ["status"]),
 
   // Posts
   posts: defineTable({

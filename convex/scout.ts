@@ -16,7 +16,7 @@ export const getObservedAthletes = query({
       .withIndex("email", (q) => q.eq("email", identity.email!))
       .first();
 
-    if (!scout || scout.role !== "SCOUT") {
+    if (scout?.role !== "SCOUT") {
       throw new Error("Not authorized");
     }
 
@@ -150,7 +150,7 @@ export const createScoutReport = mutation({
       .withIndex("email", (q) => q.eq("email", identity.email!))
       .first();
 
-    if (!scout || scout.role !== "SCOUT") {
+    if (scout?.role !== "SCOUT") {
       throw new Error("Only scouts can create reports");
     }
 

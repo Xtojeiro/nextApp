@@ -155,7 +155,7 @@ export default function Rankings() {
   );
 
   return (
-    <LinearGradient colors={colors.gradients.background as [string, string]} style={{ flex: 1 }}>
+    <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>

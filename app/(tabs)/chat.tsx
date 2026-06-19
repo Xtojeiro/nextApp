@@ -18,6 +18,10 @@ import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { requiredText } from "@/utils/formValidation";
 
+const reportChatError = (context: string, error: unknown) => {
+  console.error(`${context}:`, error);
+};
+
 export default function ChatTab() {
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -81,6 +85,7 @@ export default function ChatTab() {
       } as any);
       setMessageText("");
     } catch (error) {
+      reportChatError("Failed to send message", error);
       Alert.alert("Error", "Failed to send message");
     }
   };
@@ -95,7 +100,6 @@ export default function ChatTab() {
     if (user) {
       markAsRead({
         sessionUserId: user.id as any,
-        conversationId: conversation.id as any,
       } as any);
     }
   };
@@ -129,6 +133,7 @@ export default function ChatTab() {
         setView("chat");
       }
     } catch (error) {
+      reportChatError("Failed to start conversation", error);
       Alert.alert("Error", "Failed to start conversation");
     }
   };
@@ -204,6 +209,7 @@ export default function ChatTab() {
                   } as any);
                 }
               } catch (error) {
+                reportChatError("Failed to update block status", error);
                 Alert.alert("Error", "Failed to update block status");
               }
             }}

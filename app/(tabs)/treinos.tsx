@@ -6,7 +6,7 @@ import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   futureDateTime,
   optionalText,
@@ -27,6 +27,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Workout = Doc<"workouts">;
+type ThemeColors = ReturnType<typeof useTheme>["colors"];
 
 const emptyWorkoutForm = {
   name: "",
@@ -38,6 +39,45 @@ const emptyWorkoutForm = {
 
 type WorkoutField = keyof typeof emptyWorkoutForm;
 
+type WorkoutTextInputProps = Readonly<{
+  colors: ThemeColors;
+  error?: string;
+  keyboardType?: "default" | "numeric";
+  multiline?: boolean;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+}>;
+
+function WorkoutTextInput({
+  colors,
+  error,
+  keyboardType = "default",
+  multiline = false,
+  placeholder,
+  value,
+  onChangeText,
+}: WorkoutTextInputProps) {
+  return (
+    <>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        style={[
+          workoutInputStyle(colors),
+          multiline && { height: 100, textAlignVertical: "top" },
+          error && { borderColor: colors.danger, borderWidth: 1 },
+        ]}
+      />
+      <FormErrorText error={error} />
+    </>
+  );
+}
+
 export default function Treinos() {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -45,7 +85,14 @@ export default function Treinos() {
     api.workouts.getWorkouts,
     user ? { sessionUserId: user.id as Id<"users"> } : "skip",
   );
-  const workouts = (workoutsQuery ?? []) as Workout[];
+  const visibleWorkouts = useMemo(() => {
+    const workouts: Workout[] = workoutsQuery ?? [];
+    const todayStart = getStartOfTodayTimestamp();
+
+    return workouts
+      .filter((workout) => getWorkoutDateTimestamp(workout) >= todayStart)
+      .sort((a, b) => getWorkoutDateTimestamp(a) - getWorkoutDateTimestamp(b));
+  }, [workoutsQuery]);
   const createWorkout = useMutation(api.workouts.createWorkout);
   const startWorkout = useMutation(api.workouts.startWorkout);
   const completeWorkout = useMutation(api.workouts.completeWorkout);
@@ -64,16 +111,21 @@ export default function Treinos() {
   }, [activeWorkout]);
 
   const groupedWorkouts = {
-    scheduled: workouts.filter((workout) => workout.status === "scheduled"),
-    inProgress: workouts.filter((workout) => workout.status === "in_progress"),
-    completed: workouts.filter((workout) => workout.status === "completed"),
-    skipped: workouts.filter((workout) => workout.status === "skipped"),
+    scheduled: visibleWorkouts.filter((workout) => workout.status === "scheduled"),
+    inProgress: visibleWorkouts.filter((workout) => workout.status === "in_progress"),
+    completed: visibleWorkouts.filter((workout) => workout.status === "completed"),
+    skipped: visibleWorkouts.filter((workout) => workout.status === "skipped"),
   };
 
   const resetCreateModal = () => {
     setShowCreateModal(false);
     setForm(emptyWorkoutForm);
     setErrors({});
+  };
+
+  const updateWorkoutField = (field: WorkoutField, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
   const getStatusLabel = (status: Workout["status"]) => {
@@ -170,41 +222,105 @@ export default function Treinos() {
     }
   };
 
+  const workoutTextFields: (Omit<WorkoutTextInputProps, "colors" | "onChangeText"> & {
+    field: "name" | "description" | "duration";
+  })[] = [
+    {
+      field: "name",
+      error: errors.name,
+      placeholder: "Nome",
+      value: form.name,
+    },
+    {
+      field: "description",
+      error: errors.description,
+      multiline: true,
+      placeholder: "Descrição",
+      value: form.description,
+    },
+    {
+      field: "duration",
+      error: errors.duration,
+      keyboardType: "numeric",
+      placeholder: "Duração em minutos",
+      value: form.duration,
+    },
+  ];
+
   const renderWorkoutCard = ({ item }: { item: Workout }) => (
     <View
       style={{
         backgroundColor: colors.surface,
-        borderRadius: 16,
+        borderRadius: 14,
         padding: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
       }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
         <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}>
+          <Text
+            numberOfLines={2}
+            style={{ color: colors.text, fontSize: 18, fontWeight: "700" }}
+          >
             {item.name}
           </Text>
           {item.objective ? (
-            <Text style={{ color: colors.textMuted, marginTop: 4 }}>{item.objective}</Text>
-          ) : null}
-          <Text style={{ color: colors.textMuted, marginTop: 4 }}>
-            {item.duration_minutes || 0} min
-          </Text>
-          {item.scheduledDate ? (
-            <Text style={{ color: colors.textMuted, marginTop: 2 }}>
-              Agendado para {new Date(item.scheduledDate).toLocaleString("pt-PT")}
+            <Text
+              numberOfLines={2}
+              style={{ color: colors.textMuted, marginTop: 6, lineHeight: 19 }}
+            >
+              {item.objective}
             </Text>
+          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <Ionicons name="time-outline" size={15} color={colors.textMuted} />
+            <Text style={{ color: colors.textMuted }}>{item.duration_minutes || 0} min</Text>
+          </View>
+          {item.scheduledDate ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+              <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textMuted, flex: 1 }}
+              >
+                {new Date(item.scheduledDate).toLocaleString("pt-PT")}
+              </Text>
+            </View>
           ) : null}
         </View>
         <View
           style={{
-            backgroundColor: getStatusColor(item.status),
-            paddingHorizontal: 10,
-            paddingVertical: 6,
+            alignSelf: "flex-start",
+            backgroundColor: `${getStatusColor(item.status)}22`,
+            borderColor: `${getStatusColor(item.status)}88`,
+            borderWidth: 1,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
             borderRadius: 999,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
           }}
         >
-          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: getStatusColor(item.status),
+            }}
+          />
+          <Text style={{ color: getStatusColor(item.status), fontSize: 12, fontWeight: "700" }}>
             {getStatusLabel(item.status)}
           </Text>
         </View>
@@ -214,12 +330,20 @@ export default function Treinos() {
         <TouchableOpacity
           style={{
             backgroundColor: colors.primary,
-            paddingVertical: 10,
+            paddingVertical: 11,
             borderRadius: 10,
             alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: 8,
           }}
           onPress={() => handleStartWorkout(item)}
         >
+          <Ionicons
+            name={item.status === "in_progress" ? "play-forward" : "play"}
+            size={16}
+            color="white"
+          />
           <Text style={{ color: "white", fontWeight: "700" }}>
             {item.status === "in_progress" ? "Retomar" : "Iniciar"}
           </Text>
@@ -326,7 +450,7 @@ export default function Treinos() {
         </View>
 
         <FlatList
-          data={workouts}
+          data={visibleWorkouts}
           keyExtractor={(item) => item._id}
           renderItem={renderWorkoutCard}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
@@ -371,51 +495,14 @@ export default function Treinos() {
                 <View style={{ width: 24 }} />
               </View>
 
-              <TextInput
-                value={form.name}
-                onChangeText={(text) => {
-                  setForm((current) => ({ ...current, name: text }));
-                  setErrors((current) => ({ ...current, name: undefined }));
-                }}
-                placeholder="Nome"
-                placeholderTextColor={colors.textMuted}
-                style={[
-                  workoutInputStyle(colors),
-                  errors.name && { borderColor: colors.danger, borderWidth: 1 },
-                ]}
-              />
-              <FormErrorText error={errors.name} />
-              <TextInput
-                value={form.description}
-                onChangeText={(text) => {
-                  setForm((current) => ({ ...current, description: text }));
-                  setErrors((current) => ({ ...current, description: undefined }));
-                }}
-                placeholder="Descrição"
-                placeholderTextColor={colors.textMuted}
-                multiline
-                style={[
-                  workoutInputStyle(colors),
-                  { height: 100, textAlignVertical: "top" },
-                  errors.description && { borderColor: colors.danger, borderWidth: 1 },
-                ]}
-              />
-              <FormErrorText error={errors.description} />
-              <TextInput
-                value={form.duration}
-                onChangeText={(text) => {
-                  setForm((current) => ({ ...current, duration: text }));
-                  setErrors((current) => ({ ...current, duration: undefined }));
-                }}
-                placeholder="Duração em minutos"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-                style={[
-                  workoutInputStyle(colors),
-                  errors.duration && { borderColor: colors.danger, borderWidth: 1 },
-                ]}
-              />
-              <FormErrorText error={errors.duration} />
+              {workoutTextFields.map(({ field, ...props }) => (
+                <WorkoutTextInput
+                  key={field}
+                  {...props}
+                  colors={colors}
+                  onChangeText={(text) => updateWorkoutField(field, text)}
+                />
+              ))}
               <DateTimeField
                 label="Agendar para"
                 value={form.scheduledDate}
@@ -451,11 +538,7 @@ export default function Treinos() {
                         fontWeight: "600",
                       }}
                     >
-                      {difficulty === "beginner"
-                        ? "Iniciante"
-                        : difficulty === "intermediate"
-                          ? "Intermédio"
-                          : "Avançado"}
+                      {getDifficultyLabel(difficulty)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -482,7 +565,7 @@ export default function Treinos() {
   );
 }
 
-function workoutInputStyle(colors: ReturnType<typeof useTheme>["colors"]) {
+function workoutInputStyle(colors: ThemeColors) {
   return {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -490,4 +573,25 @@ function workoutInputStyle(colors: ReturnType<typeof useTheme>["colors"]) {
     color: colors.text,
     marginBottom: 16,
   } as const;
+}
+
+function getDifficultyLabel(difficulty: Workout["difficulty"]) {
+  switch (difficulty) {
+    case "beginner":
+      return "Iniciante";
+    case "intermediate":
+      return "Intermédio";
+    case "advanced":
+      return "Avançado";
+  }
+}
+
+function getStartOfTodayTimestamp() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.getTime();
+}
+
+function getWorkoutDateTimestamp(workout: Workout) {
+  return workout.scheduledDate ?? workout.created_at;
 }

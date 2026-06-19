@@ -20,7 +20,66 @@ interface CoachAnalyticsProps {
   onExportPress?: () => void;
 }
 
-export default function CoachAnalytics({ athletes, onAthletePress, onExportPress }: CoachAnalyticsProps) {
+type AthleteMetric = "workouts" | "games" | "points" | "efficiency";
+
+type AthleteCardProps = Readonly<{
+  athlete: AthleteData;
+  rank: number;
+  metric: AthleteMetric;
+  colors: ReturnType<typeof useTheme>["colors"];
+  onAthletePress?: (athlete: AthleteData) => void;
+}>;
+
+function getRankBadge(index: number) {
+  if (index === 0) return { icon: "trophy", color: "#FFD700" };
+  if (index === 1) return { icon: "medal", color: "#C0C0C0" };
+  if (index === 2) return { icon: "ribbon", color: "#CD7F32" };
+  return null;
+}
+
+function AthleteCard({ athlete, rank, metric, colors, onAthletePress }: AthleteCardProps) {
+  const badge = getRankBadge(rank);
+
+  return (
+    <TouchableOpacity
+      style={[styles.athleteCard, { backgroundColor: colors.surface }]}
+      onPress={() => onAthletePress?.(athlete)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.rankContainer}>
+        <Text style={[styles.rank, { color: colors.text }]}>#{rank + 1}</Text>
+        {badge && (
+          <Ionicons name={badge.icon as any} size={16} color={badge.color} />
+        )}
+      </View>
+
+      <View style={styles.athleteInfo}>
+        <Text style={[styles.athleteName, { color: colors.text }]}>{athlete.name}</Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statBadge}>
+            <Ionicons name="barbell" size={12} color={colors.primary} />
+            <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.workouts}</Text>
+          </View>
+          <View style={styles.statBadge}>
+            <Ionicons name="football" size={12} color={colors.success} />
+            <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.games}</Text>
+          </View>
+          <View style={styles.statBadge}>
+            <Ionicons name="star" size={12} color={colors.warning} />
+            <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.efficiency}%</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={[styles.metricHighlight, { backgroundColor: colors.primary + "15" }]}>
+        <Text style={[styles.metricValue, { color: colors.primary }]}>{athlete[metric]}</Text>
+        <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{metric}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function CoachAnalytics({ athletes, onAthletePress, onExportPress }: Readonly<CoachAnalyticsProps>) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
@@ -28,55 +87,6 @@ export default function CoachAnalytics({ athletes, onAthletePress, onExportPress
   const sortedByGames = [...athletes].sort((a, b) => b.games - a.games);
   const sortedByPoints = [...athletes].sort((a, b) => b.points - a.points);
   const sortedByEfficiency = [...athletes].sort((a, b) => b.efficiency - a.efficiency);
-
-  const getRankBadge = (index: number) => {
-    if (index === 0) return { icon: "trophy", color: "#FFD700" };
-    if (index === 1) return { icon: "medal", color: "#C0C0C0" };
-    if (index === 2) return { icon: "ribbon", color: "#CD7F32" };
-    return null;
-  };
-
-  const AthleteCard = ({ athlete, rank, metric }: { athlete: AthleteData; rank: number; metric: string }) => {
-    const badge = getRankBadge(rank);
-    
-    return (
-      <TouchableOpacity
-        style={[styles.athleteCard, { backgroundColor: colors.surface }]}
-        onPress={() => onAthletePress?.(athlete)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.rankContainer}>
-          <Text style={[styles.rank, { color: colors.text }]}>#{rank + 1}</Text>
-          {badge && (
-            <Ionicons name={badge.icon as any} size={16} color={badge.color} />
-          )}
-        </View>
-        
-        <View style={styles.athleteInfo}>
-          <Text style={[styles.athleteName, { color: colors.text }]}>{athlete.name}</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statBadge}>
-              <Ionicons name="barbell" size={12} color={colors.primary} />
-              <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.workouts}</Text>
-            </View>
-            <View style={styles.statBadge}>
-              <Ionicons name="football" size={12} color={colors.success} />
-              <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.games}</Text>
-            </View>
-            <View style={styles.statBadge}>
-              <Ionicons name="star" size={12} color={colors.warning} />
-              <Text style={[styles.statText, { color: colors.textMuted }]}>{athlete.efficiency}%</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={[styles.metricHighlight, { backgroundColor: colors.primary + "15" }]}>
-          <Text style={[styles.metricValue, { color: colors.primary }]}>{athlete[metric as keyof AthleteData]}</Text>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{metric}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -108,28 +118,28 @@ export default function CoachAnalytics({ athletes, onAthletePress, onExportPress
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Treinos</Text>
         {sortedByWorkouts.slice(0, 5).map((athlete, index) => (
-          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="workouts" />
+          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="workouts" colors={colors} onAthletePress={onAthletePress} />
         ))}
       </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Jogos</Text>
         {sortedByGames.slice(0, 5).map((athlete, index) => (
-          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="games" />
+          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="games" colors={colors} onAthletePress={onAthletePress} />
         ))}
       </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Pontos</Text>
         {sortedByPoints.slice(0, 5).map((athlete, index) => (
-          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="points" />
+          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="points" colors={colors} onAthletePress={onAthletePress} />
         ))}
       </View>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Eficiência</Text>
         {sortedByEfficiency.slice(0, 5).map((athlete, index) => (
-          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="efficiency" />
+          <AthleteCard key={athlete.id} athlete={athlete} rank={index} metric="efficiency" colors={colors} onAthletePress={onAthletePress} />
         ))}
       </View>
     </View>

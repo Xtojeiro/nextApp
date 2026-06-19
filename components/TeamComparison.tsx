@@ -1,6 +1,5 @@
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "react-i18next";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 
 interface TeamComparisonProps {
@@ -23,9 +22,8 @@ export default function TeamComparison({
   athletes,
   onAthleteSelect,
   selectedIds = [],
-}: TeamComparisonProps) {
+}: Readonly<TeamComparisonProps>) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
 
   const metrics = [
     { key: "workouts", label: "Treinos", icon: "barbell", color: "#3B82F6" },
@@ -38,10 +36,6 @@ export default function TeamComparison({
 
   const getMaxValue = (key: string) => {
     return Math.max(...athletes.map((a) => a[key as keyof typeof a] as number || 0), 1);
-  };
-
-  const getBarColor = (key: string) => {
-    return metrics.find((m) => m.key === key)?.color || colors.primary;
   };
 
   const toggleAthlete = (id: string) => {

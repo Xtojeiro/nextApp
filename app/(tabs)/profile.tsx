@@ -23,6 +23,283 @@ import {
 } from "react-native";
 
 type ConfirmAction = "logout" | "deleteAccount";
+type ThemeColors = ReturnType<typeof useTheme>["colors"];
+type Translate = (key: string) => string;
+
+type Achievement = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  description?: string;
+};
+
+type ReceivedInvite = {
+  _id: string;
+  status: "pending" | "accepted" | "rejected";
+  coach?: {
+    _id: string;
+    full_name?: string;
+    avatar?: string;
+  } | null;
+};
+
+type PendingFollowRequest = {
+  _id: string;
+  created_at: number;
+  requester?: {
+    _id: string;
+    full_name?: string;
+    avatar?: string;
+    role?: string;
+  } | null;
+};
+
+type AchievementsSectionProps = Readonly<{
+  achievements?: Achievement[];
+  colors: ThemeColors;
+}>;
+
+type ConfirmModalProps = Readonly<{
+  action: ConfirmAction | null;
+  colors: ThemeColors;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  t: Translate;
+}>;
+
+type PasswordModalProps = Readonly<{
+  visible: boolean;
+  colors: ThemeColors;
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+  loading: boolean;
+  onChangeCurrentPassword: (value: string) => void;
+  onChangeNewPassword: (value: string) => void;
+  onChangeConfirmNewPassword: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+  t: Translate;
+}>;
+
+function getAccountTypeLabel(
+  accountType: string | null | undefined,
+  translate: Translate,
+) {
+  if (accountType === "TREINADOR") return translate("auth.accountTypes.coach");
+  if (accountType === "OLHEIRO") return translate("auth.accountTypes.scout");
+  return translate("auth.accountTypes.player");
+}
+
+function getConfirmActionLabels(action: ConfirmAction | null, translate: Translate) {
+  if (action === "deleteAccount") {
+    return {
+      title: translate("settings.privacy.deleteAccount"),
+      message: translate("settings.privacy.deleteConfirm"),
+      confirm: translate("settings.privacy.deleteAccount"),
+    };
+  }
+
+  return {
+    title: translate("settings.security.logout"),
+    message: translate("settings.security.logout"),
+    confirm: translate("settings.security.logout"),
+  };
+}
+
+function getAchievementKey(achievement: Achievement) {
+  return achievement._id || achievement.id || achievement.name || "achievement";
+}
+
+function AchievementsSection({ achievements, colors }: AchievementsSectionProps) {
+  if (!achievements?.length) return null;
+
+  return (
+    <View style={styles.achievementsSection}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {achievements.map((achievement) => (
+          <View
+            key={getAchievementKey(achievement)}
+            style={[
+              styles.achievementCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <View style={[styles.achievementIcon, { backgroundColor: colors.primary }]}>
+              <Ionicons name="trophy" size={24} color="#fff" />
+            </View>
+            <Text style={[styles.achievementName, { color: colors.text }]}>
+              {achievement.name}
+            </Text>
+            <Text style={[styles.achievementDescription, { color: colors.textMuted }]}>
+              {achievement.description}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function PasswordModal({
+  visible,
+  colors,
+  currentPassword,
+  newPassword,
+  confirmNewPassword,
+  loading,
+  onChangeCurrentPassword,
+  onChangeNewPassword,
+  onChangeConfirmNewPassword,
+  onClose,
+  onSave,
+  t,
+}: PasswordModalProps) {
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+        <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {t("settings.security.changePassword")}
+          </Text>
+          <TouchableOpacity onPress={onSave} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={[styles.saveText, { color: colors.primary }]}>
+                {t("common.save")}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={{ flex: 1, padding: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={[styles.label, { color: colors.text }]}>
+            {t("auth.password")}
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                color: colors.text,
+                borderColor: colors.border,
+              },
+            ]}
+            value={currentPassword}
+            onChangeText={onChangeCurrentPassword}
+            placeholder={t("auth.password")}
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+          />
+          <Text style={[styles.label, { color: colors.text }]}>
+            {t("settings.security.changePassword")}
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                color: colors.text,
+                borderColor: colors.border,
+              },
+            ]}
+            value={newPassword}
+            onChangeText={onChangeNewPassword}
+            placeholder={t("settings.security.changePassword")}
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+          />
+          <Text style={[styles.label, { color: colors.text }]}>
+            {t("auth.confirmPassword")}
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                color: colors.text,
+                borderColor: colors.border,
+              },
+            ]}
+            value={confirmNewPassword}
+            onChangeText={onChangeConfirmNewPassword}
+            placeholder={t("auth.confirmPassword")}
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+          />
+        </ScrollView>
+      </LinearGradient>
+    </Modal>
+  );
+}
+
+function ConfirmActionModal({
+  action,
+  colors,
+  loading,
+  onCancel,
+  onConfirm,
+  t,
+}: ConfirmModalProps) {
+  const labels = getConfirmActionLabels(action, t);
+
+  return (
+    <Modal
+      visible={action !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <View style={styles.confirmOverlay}>
+        <View
+          style={[
+            styles.confirmCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.confirmTitle, { color: colors.text }]}>
+            {labels.title}
+          </Text>
+          <Text style={[styles.confirmMessage, { color: colors.textMuted }]}>
+            {labels.message}
+          </Text>
+          <View style={styles.confirmActions}>
+            <TouchableOpacity
+              style={[styles.confirmButton, { borderColor: colors.border }]}
+              onPress={onCancel}
+              disabled={loading}
+            >
+              <Text style={[styles.confirmButtonText, { color: colors.text }]}>
+                {t("common.cancel")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmButton, { backgroundColor: colors.danger }]}
+              onPress={onConfirm}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={[styles.confirmButtonText, { color: "#fff" }]}>
+                  {labels.confirm}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function Profile() {
   const { colors, isDarkMode, setDarkMode } = useTheme();
@@ -39,6 +316,8 @@ export default function Profile() {
   const sendMessage = useMutation(api.chat.sendMessage as any);
   const generateUploadUrl = useMutation(api.users.generateUploadUrl as any);
   const updateAvatar = useMutation(api.users.updateAvatar as any);
+  const respondToInvite = useMutation(api.invites.respondToInvite as any);
+  const respondToFollowRequest = useMutation(api.follows.respondToFollowRequest as any);
 
   const profileVisibility = useQuery(
     api.users.getProfileVisibility as any,
@@ -60,6 +339,15 @@ export default function Profile() {
     api.follows.getFollowing as any,
     user ? { userId: user.id as any, limit: 200 } : "skip",
   );
+  const receivedInvites = (useQuery(
+    api.invites.getPendingInvites as any,
+    user && accountType === "JOGADOR" ? { sessionUserId: user.id as any } : "skip",
+  ) ?? []) as ReceivedInvite[];
+  const pendingReceivedInvites = receivedInvites.filter((invite) => invite.status === "pending");
+  const pendingFollowRequests = (useQuery(
+    api.follows.getPendingFollowRequests as any,
+    user ? { sessionUserId: user.id as any, limit: 20 } : "skip",
+  ) ?? []) as PendingFollowRequest[];
 
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -77,21 +365,17 @@ export default function Profile() {
 
   const searchResults = useQuery(
     api.users.searchUsers,
-    searchQuery.trim() ? { query: searchQuery.trim(), limit: 30 } : "skip",
+    user && searchQuery.trim()
+      ? { sessionUserId: user.id as any, query: searchQuery.trim(), limit: 30 }
+      : "skip",
   );
-
   const followingIds = new Set(
     (following || []).map((item: any) => item?.following_id || item?._id || item?.id),
   );
   const visibleSearchResults = (searchResults || []).filter(
     (result: any) => (result._id || result.id) !== user?.id,
   );
-  const accountTypeLabel =
-    accountType === "TREINADOR"
-      ? t("auth.accountTypes.coach")
-      : accountType === "OLHEIRO"
-        ? t("auth.accountTypes.scout")
-        : t("auth.accountTypes.player");
+  const accountTypeLabel = getAccountTypeLabel(accountType, t);
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -101,6 +385,7 @@ export default function Profile() {
     setConfirmAction("logout");
   };
 
+  
   const handleDeleteAccount = () => {
     setConfirmAction("deleteAccount");
   };
@@ -128,6 +413,11 @@ export default function Profile() {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmNewPassword("");
+  };
+
+  const closePasswordModal = () => {
+    setPasswordModalVisible(false);
+    resetPasswordForm();
   };
 
   const handleChangePassword = async () => {
@@ -220,8 +510,11 @@ export default function Profile() {
         await unfollowUser({ sessionUserId: user.id as any, userId: targetUserId as any });
         Alert.alert("Success", t("profile.unfollowSuccess"));
       } else {
-        await followUser({ sessionUserId: user.id as any, userId: targetUserId as any });
-        Alert.alert("Success", t("profile.followSuccess"));
+        const result = await followUser({ sessionUserId: user.id as any, userId: targetUserId as any });
+        Alert.alert(
+          "Success",
+          result?.status === "pending" ? "Pedido enviado. O utilizador tem de aceitar." : t("profile.followSuccess"),
+        );
       }
     } catch {
       Alert.alert(
@@ -229,6 +522,26 @@ export default function Profile() {
         isFollowing ? t("profile.unfollowError") : t("profile.followError"),
       );
     }
+  };
+
+  const handleFollowRequestResponse = async (requestId: string, accept: boolean) => {
+    if (!user) return;
+
+    try {
+      await respondToFollowRequest({
+        sessionUserId: user.id as any,
+        requestId: requestId as any,
+        accept,
+      });
+      Alert.alert("Sucesso", accept ? "Pedido aceite." : "Pedido rejeitado.");
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao responder ao pedido.");
+    }
+  };
+
+  const handleOpenUserProfile = (targetUserId: string) => {
+    setDiscoverModalVisible(false);
+    router.push(`/user/${targetUserId}` as any);
   };
 
   const handleSendMessage = async (recipientId: string) => {
@@ -245,6 +558,21 @@ export default function Profile() {
       router.push("/chat");
     } catch {
       Alert.alert("Error", t("profile.sendMessageError"));
+    }
+  };
+
+  const handleInviteResponse = async (inviteId: string, accept: boolean) => {
+    if (!user) return;
+
+    try {
+      await respondToInvite({
+        sessionUserId: user.id as any,
+        inviteId: inviteId as any,
+        accept,
+      });
+      Alert.alert("Sucesso", accept ? "Convite aceite." : "Convite rejeitado.");
+    } catch (error) {
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao responder ao convite.");
     }
   };
 
@@ -334,32 +662,104 @@ export default function Profile() {
           </View>
         </View>
 
-        {achievements && achievements.length > 0 ? (
-          <View style={styles.achievementsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {achievements.map((achievement: any, index: number) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.achievementCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  <View style={[styles.achievementIcon, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="trophy" size={24} color="#fff" />
+        {accountType === "JOGADOR" && pendingReceivedInvites.length > 0 ? (
+          <View style={styles.socialSection}>
+            <View
+              style={[
+                styles.socialCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Convites de equipa
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                Aceita um convite para entrares na equipa do treinador.
+              </Text>
+              {pendingReceivedInvites.map((invite) => (
+                  <View
+                    key={invite._id}
+                    style={{
+                      borderTopColor: colors.border,
+                      borderTopWidth: 1,
+                      paddingTop: 12,
+                      marginTop: 12,
+                    }}
+                  >
+                    <Text style={[styles.resultName, { color: colors.text }]}>
+                      {invite.coach?.full_name || "Treinador"}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.resultActionButton, { backgroundColor: colors.success }]}
+                        onPress={() => handleInviteResponse(invite._id, true)}
+                      >
+                        <Text style={styles.resultActionText}>Aceitar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.resultActionButton, { backgroundColor: colors.danger }]}
+                        onPress={() => handleInviteResponse(invite._id, false)}
+                      >
+                        <Text style={styles.resultActionText}>Rejeitar</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <Text style={[styles.achievementName, { color: colors.text }]}>
-                    {achievement.name}
-                  </Text>
-                  <Text style={[styles.achievementDescription, { color: colors.textMuted }]}>
-                    {achievement.description}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
+                ))}
+            </View>
           </View>
         ) : null}
+
+        {pendingFollowRequests.length > 0 ? (
+          <View style={styles.socialSection}>
+            <View
+              style={[
+                styles.socialCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Pedidos para seguir
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                Estes utilizadores querem ver o teu perfil privado.
+              </Text>
+              {pendingFollowRequests.map((request) => (
+                <View
+                  key={request._id}
+                  style={{
+                    borderTopColor: colors.border,
+                    borderTopWidth: 1,
+                    paddingTop: 12,
+                    marginTop: 12,
+                  }}
+                >
+                  <Text style={[styles.resultName, { color: colors.text }]}>
+                    {request.requester?.full_name || "Utilizador"}
+                  </Text>
+                  <Text style={[styles.resultRole, { color: colors.textMuted }]}>
+                    {request.requester?.role || "Conta"}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.resultActionButton, { backgroundColor: colors.success }]}
+                      onPress={() => handleFollowRequestResponse(request._id, true)}
+                    >
+                      <Text style={styles.resultActionText}>Aceitar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.resultActionButton, { backgroundColor: colors.danger }]}
+                      onPress={() => handleFollowRequestResponse(request._id, false)}
+                    >
+                      <Text style={styles.resultActionText}>Rejeitar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <AchievementsSection achievements={achievements} colors={colors} />
       </ScrollView>
 
       <Modal
@@ -405,7 +805,8 @@ export default function Profile() {
 
             {visibleSearchResults.map((result: any) => {
               const targetUserId = String(result._id || result.id);
-              const isFollowing = followingIds.has(targetUserId);
+              const isFollowing = result.followStatus === "following" || followingIds.has(targetUserId);
+              const isPending = result.followStatus === "pending";
 
               return (
                 <View
@@ -433,12 +834,30 @@ export default function Profile() {
                     <TouchableOpacity
                       style={[
                         styles.resultActionButton,
-                        { backgroundColor: isFollowing ? colors.warning : colors.primary },
+                        { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                      ]}
+                      onPress={() => handleOpenUserProfile(targetUserId)}
+                    >
+                      <Text style={[styles.resultActionText, { color: colors.text }]}>
+                        Ver conta
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={isPending}
+                      style={[
+                        styles.resultActionButton,
+                        {
+                          backgroundColor: isPending
+                            ? colors.warning
+                            : isFollowing
+                              ? colors.warning
+                              : colors.primary,
+                        },
                       ]}
                       onPress={() => handleFollowToggle(targetUserId, isFollowing)}
                     >
                       <Text style={styles.resultActionText}>
-                        {isFollowing ? t("profile.unfollow") : t("profile.follow")}
+                        {isPending ? "Pendente" : isFollowing ? t("profile.unfollow") : result.is_public ? t("profile.follow") : "Pedir"}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -632,7 +1051,7 @@ export default function Profile() {
                     });
                     Alert.alert(
                       "Sucesso",
-                      `Perfil agora estÃ¡ ${newVisibility.is_public ? "pÃºblico" : "privado"}`,
+                      `Perfil agora está ${newVisibility.is_public ? "público" : "privado"}`,
                     );
                   } catch {
                     Alert.alert("Erro", "Falha ao alterar visibilidade");
@@ -640,10 +1059,10 @@ export default function Profile() {
                 }}
                 style={styles.settingRow}
               >
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Perfil PÃºblico</Text>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Perfil Público</Text>
                 <View style={styles.selectorChip}>
                   <Text style={{ color: colors.text }}>
-                    {profileVisibility === true ? "PÃºblico" : "Privado"}
+                    {profileVisibility === true ? "Público" : "Privado"}
                   </Text>
                   <Ionicons
                     name={profileVisibility === true ? "globe" : "lock-closed"}
@@ -655,8 +1074,8 @@ export default function Profile() {
               </TouchableOpacity>
               <Text style={[styles.settingDescription, { color: colors.textMuted }]}>
                 {profileVisibility === true
-                  ? "Seu perfil Ã© visÃ­vel para outros utilizadores na pesquisa"
-                  : "Seu perfil sÃ³ Ã© visÃ­vel para vocÃª"}
+                  ? "Seu perfil é visível para outros utilizadores na pesquisa"
+                  : "Seu perfil só é visível para você"}
               </Text>
             </View>
 
@@ -704,151 +1123,29 @@ export default function Profile() {
         </LinearGradient>
       </Modal>
 
-      <Modal
+      <PasswordModal
         visible={passwordModalVisible}
-        animationType="slide"
-        onRequestClose={() => {
-          setPasswordModalVisible(false);
-          resetPasswordForm();
-        }}
-      >
-        <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity
-              onPress={() => {
-                setPasswordModalVisible(false);
-                resetPasswordForm();
-              }}
-            >
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {t("settings.security.changePassword")}
-            </Text>
-            <TouchableOpacity onPress={handleChangePassword} disabled={passwordLoading}>
-              {passwordLoading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <Text style={[styles.saveText, { color: colors.primary }]}>
-                  {t("common.save")}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            style={{ flex: 1, padding: 16 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={[styles.label, { color: colors.text }]}>
-              {t("auth.password")}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder={t("auth.password")}
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
-            />
-            <Text style={[styles.label, { color: colors.text }]}>
-              {t("settings.security.changePassword")}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder={t("settings.security.changePassword")}
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
-            />
-            <Text style={[styles.label, { color: colors.text }]}>
-              {t("auth.confirmPassword")}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  borderColor: colors.border,
-                },
-              ]}
-              value={confirmNewPassword}
-              onChangeText={setConfirmNewPassword}
-              placeholder={t("auth.confirmPassword")}
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
-            />
-          </ScrollView>
-        </LinearGradient>
-      </Modal>
+        colors={colors}
+        currentPassword={currentPassword}
+        newPassword={newPassword}
+        confirmNewPassword={confirmNewPassword}
+        loading={passwordLoading}
+        onChangeCurrentPassword={setCurrentPassword}
+        onChangeNewPassword={setNewPassword}
+        onChangeConfirmNewPassword={setConfirmNewPassword}
+        onClose={closePasswordModal}
+        onSave={handleChangePassword}
+        t={t}
+      />
 
-      <Modal
-        visible={confirmAction !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmAction(null)}
-      >
-        <View style={styles.confirmOverlay}>
-          <View
-            style={[
-              styles.confirmCard,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.confirmTitle, { color: colors.text }]}>
-              {confirmAction === "deleteAccount"
-                ? t("settings.privacy.deleteAccount")
-                : t("settings.security.logout")}
-            </Text>
-            <Text style={[styles.confirmMessage, { color: colors.textMuted }]}>
-              {confirmAction === "deleteAccount"
-                ? t("settings.privacy.deleteConfirm")
-                : t("settings.security.logout")}
-            </Text>
-            <View style={styles.confirmActions}>
-              <TouchableOpacity
-                style={[styles.confirmButton, { borderColor: colors.border }]}
-                onPress={() => setConfirmAction(null)}
-                disabled={confirmLoading}
-              >
-                <Text style={[styles.confirmButtonText, { color: colors.text }]}>
-                  {t("common.cancel")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmButton, { backgroundColor: colors.danger }]}
-                onPress={handleConfirmAction}
-                disabled={confirmLoading}
-              >
-                {confirmLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={[styles.confirmButtonText, { color: "#fff" }]}>
-                    {confirmAction === "deleteAccount"
-                      ? t("settings.privacy.deleteAccount")
-                      : t("settings.security.logout")}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ConfirmActionModal
+        action={confirmAction}
+        colors={colors}
+        loading={confirmLoading}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+        t={t}
+      />
 
       <Modal
         visible={editModalVisible}
@@ -1176,6 +1473,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
+  },
+  profilePreviewCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    gap: 16,
+  },
+  profilePreviewAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginRight: 12,
+  },
+  profilePreviewName: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  privateProfileBox: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  activityRow: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
   },
   searchResultMain: {
     flexDirection: "row",

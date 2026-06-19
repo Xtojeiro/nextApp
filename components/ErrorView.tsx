@@ -8,7 +8,7 @@ interface ErrorViewProps {
   onRetry?: () => void;
 }
 
-export default function ErrorView({ message, onRetry }: ErrorViewProps) {
+export default function ErrorView({ message, onRetry }: Readonly<ErrorViewProps>) {
   const { colors } = useTheme();
 
   return (

@@ -19,8 +19,24 @@ async function comparePassword(hash: string, password: string): Promise<boolean>
 }
 
 function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  const trimmedEmail = email.trim();
+  if (trimmedEmail.length > 254 || trimmedEmail.includes(" ")) return false;
+
+  const atIndex = trimmedEmail.indexOf("@");
+  const lastAtIndex = trimmedEmail.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex !== lastAtIndex) return false;
+
+  const domain = trimmedEmail.slice(atIndex + 1);
+  const localPart = trimmedEmail.slice(0, atIndex);
+  const dotIndex = domain.lastIndexOf(".");
+
+  return (
+    localPart.length > 0 &&
+    domain.length > 3 &&
+    dotIndex > 0 &&
+    dotIndex < domain.length - 1 &&
+    !domain.includes(" ")
+  );
 }
 
 function sanitizeString(str: string): string {
@@ -31,6 +47,114 @@ function normalizeRole(role: string): "PLAYER" | "COACH" | "SCOUT" {
   if (role === "athlete" || role === "PLAYER") return "PLAYER";
   if (role === "coach" || role === "COACH") return "COACH";
   return "SCOUT";
+}
+
+async function deleteByIndex(ctx: any, table: string, index: string, field: string, value: any) {
+  const docs = await ctx.db
+    .query(table)
+    .withIndex(index, (q: any) => q.eq(field, value))
+    .collect();
+
+  for (const doc of docs) {
+    await ctx.db.delete(doc._id);
+  }
+}
+
+async function deleteFirstByIndex(ctx: any, table: string, index: string, field: string, value: any) {
+  const doc = await ctx.db
+    .query(table)
+    .withIndex(index, (q: any) => q.eq(field, value))
+    .first();
+
+  if (doc) {
+    await ctx.db.delete(doc._id);
+  }
+}
+
+async function deleteIndexedParentsWithChildren(
+  ctx: any,
+  parent: UserCleanupTask,
+  child: UserCleanupTask,
+  value: any,
+) {
+  const parents = await ctx.db
+    .query(parent.table)
+    .withIndex(parent.index, (q: any) => q.eq(parent.field, value))
+    .collect();
+
+  for (const item of parents) {
+    await deleteByIndex(ctx, child.table, child.index, child.field, item._id);
+    await ctx.db.delete(item._id);
+  }
+}
+
+async function deleteUserConversations(ctx: any, userId: any) {
+  const conversations = await ctx.db.query("conversations").collect();
+  const userConversations = conversations.filter(
+    (conversation: any) =>
+      conversation.user_one_id === userId || conversation.user_two_id === userId,
+  );
+
+  for (const conversation of userConversations) {
+    await deleteByIndex(ctx, "messages", "by_conversation_id", "conversation_id", conversation._id);
+    await ctx.db.delete(conversation._id);
+  }
+}
+
+type UserCleanupTask = {
+  table: string;
+  index: string;
+  field: string;
+  deleteFirst?: boolean;
+};
+
+type CleanupTuple = [table: string, index: string, field: string, deleteFirst?: boolean];
+
+function cleanupTask([table, index, field, deleteFirst]: CleanupTuple): UserCleanupTask {
+  return { table, index, field, deleteFirst };
+}
+
+const userCleanupTaskTuples: CleanupTuple[] = [
+  ["players", "by_userId", "userId", true],
+  ["coaches", "by_userId", "userId", true],
+  ["posts", "by_user_id", "user_id"],
+  ["workoutLogs", "by_userId", "userId"],
+  ["workouts", "by_user_id", "user_id"],
+  ["follows", "by_follower_id", "follower_id"],
+  ["follows", "by_following_id", "following_id"],
+  ["followRequests", "by_requester_id", "requester_id"],
+  ["followRequests", "by_target_id", "target_id"],
+  ["blockedUsers", "by_blockerId", "blockerId"],
+  ["blockedUsers", "by_blockedId", "blockedId"],
+  ["notifications", "by_userId", "userId"],
+  ["userAchievements", "by_userId", "userId"],
+];
+
+const userCleanupTasks = userCleanupTaskTuples.map(cleanupTask);
+
+const authCleanupPairs = [
+  {
+    parent: cleanupTask(["authAccounts", "userIdAndProvider", "userId"]),
+    child: cleanupTask(["authVerificationCodes", "accountId", "accountId"]),
+  },
+  {
+    parent: cleanupTask(["authSessions", "userId", "userId"]),
+    child: cleanupTask(["authRefreshTokens", "sessionId", "sessionId"]),
+  },
+];
+
+async function deleteUserRelatedData(ctx: any, userId: any) {
+  for (const pair of authCleanupPairs) {
+    await deleteIndexedParentsWithChildren(ctx, pair.parent, pair.child, userId);
+  }
+
+  for (const task of userCleanupTasks) {
+    if (task.deleteFirst) {
+      await deleteFirstByIndex(ctx, task.table, task.index, task.field, userId);
+    } else {
+      await deleteByIndex(ctx, task.table, task.index, task.field, userId);
+    }
+  }
 }
 
 export const loginUser = mutation({
@@ -329,31 +453,189 @@ export const getProfileVisibility = query({
       }
       targetUserId = currentUser._id;
     }
+    if (!targetUserId) {
+      return false;
+    }
 
-    const user = (await ctx.db.get(targetUserId!)) as any;
+    const user = (await ctx.db.get(targetUserId)) as any;
     return user?.is_public ?? false;
   },
 });
 
 export const searchUsers = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     query: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
     const limit = args.limit || 20;
     const sanitizedQuery = cleanText(args.query, "Search query", 80).toLowerCase();
-    const publicUsers = await ctx.db.query("users").collect();
+    const users = await ctx.db.query("users").collect();
 
-    return publicUsers
-      .filter(
-        (user) =>
-          user.is_public &&
-          ((user.full_name || user.name || user.email || "").toLowerCase().includes(sanitizedQuery) ||
-            user.bio?.toLowerCase().includes(sanitizedQuery) ||
-            user.location?.toLowerCase().includes(sanitizedQuery)),
-      )
+    const matches = users
+      .filter((user) => {
+        if (user._id === currentUser?._id) return false;
+        const publicProfile = user.is_public !== false;
+        const publicText = [
+          user.full_name,
+          user.name,
+          user.email,
+          publicProfile ? user.bio : undefined,
+          publicProfile ? user.location : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return publicText.includes(sanitizedQuery);
+      })
       .slice(0, limit);
+
+    return await Promise.all(
+      matches.map(async (user) => {
+        const follow = currentUser
+          ? await ctx.db
+              .query("follows")
+              .withIndex("by_follower_id", (q) => q.eq("follower_id", currentUser._id))
+              .filter((q) => q.eq(q.field("following_id"), user._id))
+              .first()
+          : null;
+        const request = currentUser
+          ? await ctx.db
+              .query("followRequests")
+              .withIndex("by_requester_id", (q) => q.eq("requester_id", currentUser._id))
+              .filter((q) => q.eq(q.field("target_id"), user._id))
+              .filter((q) => q.eq(q.field("status"), "pending"))
+              .first()
+          : null;
+        const canViewActivity = Boolean(user.is_public !== false || follow || user._id === currentUser?._id);
+
+        return {
+          _id: user._id,
+          full_name: user.full_name || user.name || "Utilizador",
+          avatar: user.avatar,
+          bio: canViewActivity ? user.bio : undefined,
+          location: canViewActivity ? user.location : undefined,
+          role: user.role,
+          is_public: user.is_public ?? true,
+          canViewActivity,
+          followStatus: follow ? "following" : request ? "pending" : "none",
+        };
+      }),
+    );
+  },
+});
+
+export const getUserProfileView = query({
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) {
+      throw new Error("User not found");
+    }
+
+    const follow = currentUser
+      ? await ctx.db
+          .query("follows")
+          .withIndex("by_follower_id", (q) => q.eq("follower_id", currentUser._id))
+          .filter((q) => q.eq(q.field("following_id"), args.userId))
+          .first()
+      : null;
+    const request = currentUser
+      ? await ctx.db
+          .query("followRequests")
+          .withIndex("by_requester_id", (q) => q.eq("requester_id", currentUser._id))
+          .filter((q) => q.eq(q.field("target_id"), args.userId))
+          .filter((q) => q.eq(q.field("status"), "pending"))
+          .first()
+      : null;
+    const isOwnProfile = currentUser?._id === args.userId;
+    const canViewActivity = Boolean(isOwnProfile || targetUser.is_public !== false || follow);
+    const limit = args.limit || 10;
+
+    if (!canViewActivity) {
+      return {
+        user: {
+          _id: targetUser._id,
+          full_name: targetUser.full_name || targetUser.name || "Utilizador",
+          avatar: targetUser.avatar,
+          role: targetUser.role,
+          is_public: targetUser.is_public ?? true,
+        },
+        canViewActivity,
+        followStatus: follow ? "following" : request ? "pending" : "none",
+        games: [],
+        workouts: [],
+      };
+    }
+
+    const [workouts, gameStats, player] = await Promise.all([
+      ctx.db
+        .query("workouts")
+        .withIndex("by_user_id", (q) => q.eq("user_id", args.userId))
+        .collect(),
+      ctx.db
+        .query("gameStats")
+        .withIndex("by_playerId", (q) => q.eq("playerId", args.userId))
+        .collect(),
+      ctx.db
+        .query("players")
+        .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+        .first(),
+    ]);
+
+    const gamesByStats = await Promise.all(
+      gameStats.map(async (stat) => {
+        const game = await ctx.db.get(stat.gameId);
+        if (!game) return null;
+        const [team1, team2] = await Promise.all([
+          ctx.db.get(game.team1Id),
+          ctx.db.get(game.team2Id),
+        ]);
+        return { ...game, team1, team2, playerStats: stat };
+      }),
+    );
+
+    let games: any[] = gamesByStats.filter(Boolean);
+    if (games.length === 0 && player?.teamId) {
+      const teamGames = (await ctx.db.query("games").collect())
+        .filter((game) => game.team1Id === player.teamId || game.team2Id === player.teamId)
+        .filter((game) => game.status === "completed");
+      games = await Promise.all(
+        teamGames.map(async (game) => {
+          const [team1, team2] = await Promise.all([
+            ctx.db.get(game.team1Id),
+            ctx.db.get(game.team2Id),
+          ]);
+          return { ...game, team1, team2, playerStats: null };
+        }),
+      );
+    }
+
+    games.sort((a: any, b: any) => (b?.date || 0) - (a?.date || 0));
+    workouts.sort((a, b) => b.created_at - a.created_at);
+
+    return {
+      user: {
+        _id: targetUser._id,
+        full_name: targetUser.full_name || targetUser.name || "Utilizador",
+        avatar: targetUser.avatar,
+        bio: targetUser.bio,
+        location: targetUser.location,
+        role: targetUser.role,
+        is_public: targetUser.is_public ?? true,
+      },
+      canViewActivity,
+      followStatus: follow ? "following" : request ? "pending" : "none",
+      games: games.slice(0, limit),
+      workouts: workouts.slice(0, limit),
+    };
   },
 });
 
@@ -364,7 +646,7 @@ export const getTeamAthletes = query({
   },
   handler: async (ctx, args) => {
     const coach = await resolveSessionUser(ctx, args.sessionUserId);
-    if (!coach || coach.role !== "COACH") {
+    if (coach?.role !== "COACH") {
       return [];
     }
 
@@ -508,7 +790,7 @@ export const getCoachDashboard = query({
   },
   handler: async (ctx, args) => {
     const coach = await resolveSessionUser(ctx, args.sessionUserId);
-    if (!coach || coach.role !== "COACH") {
+    if (coach?.role !== "COACH") {
       return { totalAthletes: 0, recentWorkouts: 0, upcomingEvents: 0, athletes: [] };
     }
 
@@ -554,141 +836,8 @@ export const deleteAccount = mutation({
     const user = await requireSessionUser(ctx, args.sessionUserId);
     const userId = user._id;
 
-    const authAccounts = await ctx.db
-      .query("authAccounts")
-      .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
-      .collect();
-    for (const account of authAccounts) {
-      const verificationCodes = await ctx.db
-        .query("authVerificationCodes")
-        .withIndex("accountId", (q) => q.eq("accountId", account._id))
-        .collect();
-      for (const code of verificationCodes) {
-        await ctx.db.delete(code._id);
-      }
-      await ctx.db.delete(account._id);
-    }
-
-    const authSessions = await ctx.db
-      .query("authSessions")
-      .withIndex("userId", (q) => q.eq("userId", userId))
-      .collect();
-    for (const session of authSessions) {
-      const refreshTokens = await ctx.db
-        .query("authRefreshTokens")
-        .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
-        .collect();
-      for (const token of refreshTokens) {
-        await ctx.db.delete(token._id);
-      }
-      await ctx.db.delete(session._id);
-    }
-
-    const playerProfile = await ctx.db
-      .query("players")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .first();
-    if (playerProfile) {
-      await ctx.db.delete(playerProfile._id);
-    }
-
-    const coachProfile = await ctx.db
-      .query("coaches")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .first();
-    if (coachProfile) {
-      await ctx.db.delete(coachProfile._id);
-    }
-
-    const posts = await ctx.db
-      .query("posts")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
-      .collect();
-    for (const post of posts) {
-      await ctx.db.delete(post._id);
-    }
-
-    const workoutLogs = await ctx.db
-      .query("workoutLogs")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-    for (const log of workoutLogs) {
-      await ctx.db.delete(log._id);
-    }
-
-    const workouts = await ctx.db
-      .query("workouts")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
-      .collect();
-    for (const workout of workouts) {
-      await ctx.db.delete(workout._id);
-    }
-
-    const followsAsFollower = await ctx.db
-      .query("follows")
-      .withIndex("by_follower_id", (q) => q.eq("follower_id", userId))
-      .collect();
-    for (const follow of followsAsFollower) {
-      await ctx.db.delete(follow._id);
-    }
-
-    const followsAsFollowing = await ctx.db
-      .query("follows")
-      .withIndex("by_following_id", (q) => q.eq("following_id", userId))
-      .collect();
-    for (const follow of followsAsFollowing) {
-      await ctx.db.delete(follow._id);
-    }
-
-    const blockedByUser = await ctx.db
-      .query("blockedUsers")
-      .withIndex("by_blockerId", (q) => q.eq("blockerId", userId))
-      .collect();
-    for (const blocked of blockedByUser) {
-      await ctx.db.delete(blocked._id);
-    }
-
-    const blockedUsers = await ctx.db
-      .query("blockedUsers")
-      .withIndex("by_blockedId", (q) => q.eq("blockedId", userId))
-      .collect();
-    for (const blocked of blockedUsers) {
-      await ctx.db.delete(blocked._id);
-    }
-
-    const conversations = await ctx.db.query("conversations").collect();
-    const userConversations = conversations.filter(
-      (conversation) =>
-        conversation.user_one_id === userId || conversation.user_two_id === userId,
-    );
-    for (const conversation of userConversations) {
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_conversation_id", (q) =>
-          q.eq("conversation_id", conversation._id),
-        )
-        .collect();
-      for (const message of messages) {
-        await ctx.db.delete(message._id);
-      }
-      await ctx.db.delete(conversation._id);
-    }
-
-    const notifications = await ctx.db
-      .query("notifications")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-    for (const notification of notifications) {
-      await ctx.db.delete(notification._id);
-    }
-
-    const userAchievements = await ctx.db
-      .query("userAchievements")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .collect();
-    for (const achievement of userAchievements) {
-      await ctx.db.delete(achievement._id);
-    }
+    await deleteUserRelatedData(ctx, userId);
+    await deleteUserConversations(ctx, userId);
 
     await ctx.db.delete(userId);
     return { success: true };

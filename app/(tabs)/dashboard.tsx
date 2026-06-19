@@ -41,6 +41,26 @@ type EventFormState = {
 
 type EventFormField = keyof EventFormState | "schedule";
 
+type EventModalProps = Readonly<{
+  visible: boolean;
+  event?: any;
+  onClose: () => void;
+  onSave: (form: EventFormState) => void;
+  onDelete?: () => void;
+}>;
+
+type ActivityHeatmapProps = Readonly<{
+  workoutLogs: { completedDate: number }[];
+  events: { date: string; type?: EventType }[];
+}>;
+
+type StatCardProps = Readonly<{
+  label: string;
+  value: number;
+  color: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}>;
+
 const emptyEventForm: EventFormState = {
   title: "",
   date: "",
@@ -57,13 +77,7 @@ function EventModal({
   onClose,
   onSave,
   onDelete,
-}: {
-  visible: boolean;
-  event?: any;
-  onClose: () => void;
-  onSave: (form: EventFormState) => void;
-  onDelete?: () => void;
-}) {
+}: EventModalProps) {
   const { colors } = useTheme();
   const [form, setForm] = useState<EventFormState>(emptyEventForm);
   const [errors, setErrors] = useState<ValidationErrors<EventFormField>>({});
@@ -82,7 +96,10 @@ function EventModal({
     setErrors({});
   }, [event, visible]);
 
-  const setField = (field: keyof EventFormState, value: string | EventType) => {
+  const setField = <Field extends keyof EventFormState>(
+    field: Field,
+    value: EventFormState[Field],
+  ) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined, schedule: undefined }));
   };
@@ -196,9 +213,7 @@ function EventModal({
           >
             <Picker
               selectedValue={form.type}
-              onValueChange={(value) =>
-                setField("type", value as EventType)
-              }
+              onValueChange={(value) => setField("type", value as EventType)}
               style={{ color: colors.text }}
             >
               <Picker.Item label="Treino" value="training" />
@@ -282,10 +297,7 @@ function EventModal({
 function ActivityHeatmap({
   workoutLogs,
   events,
-}: {
-  workoutLogs: { completedDate: number }[];
-  events: { date: string }[];
-}) {
+}: ActivityHeatmapProps) {
   const { colors } = useTheme();
   const today = new Date();
   const activityMap = new Map<string, number>();
@@ -354,6 +366,7 @@ export default function Dashboard() {
   );
   const workoutLogs = (workoutLogsQuery ?? []) as any[];
   const events = (eventsQuery ?? []) as any[];
+  const countableEvents = events.filter((event) => event.type !== "training");
   const playerStats =
     useQuery(
       api.users.getPlayerStats,
@@ -395,13 +408,13 @@ export default function Dashboard() {
   weekStart.setDate(now.getDate() - now.getDay());
   weekStart.setHours(0, 0, 0, 0);
   const summary = {
-    totalActivities: workoutLogs.length + events.length,
+    totalActivities: workoutLogs.length + countableEvents.length,
     monthActivities:
       workoutLogs.filter((log) => log.completedDate >= monthStart).length +
-      events.filter((event) => new Date(event.date).getTime() >= monthStart).length,
+      countableEvents.filter((event) => new Date(event.date).getTime() >= monthStart).length,
     weekActivities:
       workoutLogs.filter((log) => log.completedDate >= weekStart.getTime()).length +
-      events.filter((event) => new Date(event.date).getTime() >= weekStart.getTime()).length,
+      countableEvents.filter((event) => new Date(event.date).getTime() >= weekStart.getTime()).length,
   };
 
   if (!convexUser) {
@@ -490,7 +503,7 @@ export default function Dashboard() {
             <StatCard label="Pontos" value={playerStats.points} color={colors.warning} colors={colors} />
           </View>
 
-          <ActivityHeatmap workoutLogs={workoutLogs} events={events} />
+          <ActivityHeatmap workoutLogs={workoutLogs} events={countableEvents} />
 
           <View
             style={{
@@ -571,12 +584,7 @@ function StatCard({
   value,
   color,
   colors,
-}: {
-  label: string;
-  value: number;
-  color: string;
-  colors: ReturnType<typeof useTheme>["colors"];
-}) {
+}: StatCardProps) {
   return (
     <View
       style={{

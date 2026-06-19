@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+function calculateLeaguePoints(wins: number | undefined, draws: number | undefined) {
+  return (wins ?? 0) * 3 + (draws ?? 0);
+}
+
 // Get all seasons
 export const getAll = query({
   handler: async (ctx) => {
@@ -235,7 +239,11 @@ export const getLeagueStandings = query({
     for (const lt of leagueTeams) {
       const team = await ctx.db.get(lt.teamId);
       if (team) {
-        standings.push({ ...lt, team });
+        standings.push({
+          ...lt,
+          points: calculateLeaguePoints(lt.wins, lt.draws),
+          team,
+        });
       }
     }
 
@@ -263,6 +271,17 @@ export const updateTeamStats = mutation({
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    const leagueTeam = await ctx.db.get(id);
+    if (!leagueTeam) {
+      throw new Error("League team not found");
+    }
+
+    const wins = updates.wins ?? leagueTeam.wins ?? 0;
+    const draws = updates.draws ?? leagueTeam.draws ?? 0;
+
+    await ctx.db.patch(id, {
+      ...updates,
+      points: calculateLeaguePoints(wins, draws),
+    });
   },
 });

@@ -3,6 +3,45 @@ import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 import { cleanOptionalText, cleanText } from "./validation";
 
+const emptyTeamStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+
+async function resolveTeamIdForStats(ctx: any, user: any, requestedTeamId?: any) {
+  if (requestedTeamId) {
+    return requestedTeamId;
+  }
+  if (user.role !== "COACH") {
+    return undefined;
+  }
+
+  const coach = await ctx.db
+    .query("coaches")
+    .withIndex("by_userId", (q: any) => q.eq("userId", user._id))
+    .first();
+
+  return coach?.teamId;
+}
+
+function getGameResultForTeam(game: any, targetTeamId: any) {
+  if (game.score1 === undefined || game.score2 === undefined) {
+    return null;
+  }
+
+  const isTeam1 = game.team1Id === targetTeamId;
+  const teamScore = isTeam1 ? game.score1 : game.score2;
+  const opponentScore = isTeam1 ? game.score2 : game.score1;
+
+  if (teamScore > opponentScore) return "wins";
+  if (teamScore < opponentScore) return "losses";
+  return "draws";
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export const getTeam = query({
   args: {
     sessionUserId: v.optional(v.id("users")),
@@ -95,6 +134,80 @@ export const getTeamAthletes = query({
   },
 });
 
+export const searchAvailableAthletes = query({
+  args: {
+    sessionUserId: v.id("users"),
+    query: v.string(),
+    teamId: v.optional(v.id("teams")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
+      return [];
+    }
+
+    let targetTeamId = args.teamId;
+    if (!targetTeamId) {
+      const coachProfile = await ctx.db
+        .query("coaches")
+        .withIndex("by_userId", (q) => q.eq("userId", coach._id))
+        .first();
+      targetTeamId = coachProfile?.teamId;
+    }
+    if (!targetTeamId) {
+      return [];
+    }
+
+    const search = normalizeSearchText(cleanText(args.query, "Search query", 80));
+    const limit = args.limit || 20;
+    const players = await ctx.db.query("players").collect();
+    const invites = await ctx.db
+      .query("invites")
+      .withIndex("by_coachId", (q) => q.eq("coachId", coach._id))
+      .collect();
+    const inviteByAthlete = new Map(invites.map((invite) => [invite.athleteId, invite]));
+
+    const results = [];
+    for (const player of players) {
+      if (player.teamId === targetTeamId) continue;
+      const athleteUser = await ctx.db.get(player.userId);
+      if (!athleteUser || athleteUser.role !== "PLAYER" || athleteUser.is_public === false) continue;
+
+      const searchable = normalizeSearchText(
+        [
+          athleteUser.full_name,
+          athleteUser.name,
+          athleteUser.email,
+          athleteUser.bio,
+          athleteUser.location,
+          player.position,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      if (!searchable.includes(search)) continue;
+      const invite = inviteByAthlete.get(athleteUser._id);
+      results.push({
+        playerId: player._id,
+        athleteId: athleteUser._id,
+        full_name: athleteUser.full_name || athleteUser.name || athleteUser.email || "Atleta",
+        email: athleteUser.email,
+        avatar: athleteUser.avatar,
+        bio: athleteUser.bio,
+        position: player.position,
+        teamId: player.teamId,
+        inviteStatus: invite?.status,
+      });
+
+      if (results.length >= limit) break;
+    }
+
+    return results;
+  },
+});
+
 export const createTeam = mutation({
   args: {
     sessionUserId: v.id("users"),
@@ -128,6 +241,53 @@ export const createTeam = mutation({
     }
 
     return { success: true, teamId };
+  },
+});
+
+export const associateCoachToTeam = mutation({
+  args: {
+    sessionUserId: v.id("users"),
+    teamId: v.id("teams"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
+    if (user.role !== "COACH") {
+      throw new Error("Only coaches can associate with a team");
+    }
+
+    const team = await ctx.db.get(args.teamId);
+    if (!team) {
+      throw new Error("Team not found");
+    }
+
+    const now = Date.now();
+    if (team.coachId !== user._id) {
+      const previousCoachProfile = await ctx.db
+        .query("coaches")
+        .withIndex("by_userId", (q) => q.eq("userId", team.coachId))
+        .first();
+      if (previousCoachProfile?.teamId === args.teamId) {
+        await ctx.db.patch(previousCoachProfile._id, { teamId: undefined });
+      }
+    }
+
+    await ctx.db.patch(args.teamId, {
+      coachId: user._id,
+      updatedAt: now,
+    });
+
+    const coachProfile = await ctx.db
+      .query("coaches")
+      .withIndex("by_userId", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (coachProfile) {
+      await ctx.db.patch(coachProfile._id, { teamId: args.teamId });
+    } else {
+      await ctx.db.insert("coaches", { userId: user._id, teamId: args.teamId });
+    }
+
+    return { success: true };
   },
 });
 
@@ -215,20 +375,12 @@ export const getTeamStats = query({
   handler: async (ctx, args) => {
     const user = await resolveSessionUser(ctx, args.sessionUserId);
     if (!user) {
-      return { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+      return emptyTeamStats;
     }
 
-    let targetTeamId = args.teamId;
-    if (!targetTeamId && user.role === "COACH") {
-      const coach = await ctx.db
-        .query("coaches")
-        .withIndex("by_userId", (q) => q.eq("userId", user._id))
-        .first();
-      if (coach?.teamId) targetTeamId = coach.teamId;
-    }
-
+    const targetTeamId = await resolveTeamIdForStats(ctx, user, args.teamId);
     if (!targetTeamId) {
-      return { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+      return emptyTeamStats;
     }
 
     const games = await ctx.db.query("games").collect();
@@ -242,14 +394,10 @@ export const getTeamStats = query({
     let draws = 0;
 
     for (const game of completedGames) {
-      if (game.score1 === undefined || game.score2 === undefined) continue;
-      const isTeam1 = game.team1Id === targetTeamId;
-      const teamScore = isTeam1 ? game.score1 : game.score2;
-      const opponentScore = isTeam1 ? game.score2 : game.score1;
-
-      if (teamScore > opponentScore) wins++;
-      else if (teamScore < opponentScore) losses++;
-      else draws++;
+      const result = getGameResultForTeam(game, targetTeamId);
+      if (result === "wins") wins++;
+      if (result === "losses") losses++;
+      if (result === "draws") draws++;
     }
 
     return {

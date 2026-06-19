@@ -8,7 +8,7 @@ interface EvolutionChartProps {
   color?: string;
 }
 
-export default function EvolutionChart({ data, title, color }: EvolutionChartProps) {
+export default function EvolutionChart({ data, title, color }: Readonly<EvolutionChartProps>) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const chartColor = color || colors.primary;
@@ -37,7 +37,7 @@ export default function EvolutionChart({ data, title, color }: EvolutionChartPro
           <View style={styles.gridLines}>
             {[0, 1, 2, 3, 4].map((i) => (
               <View
-                key={i}
+                key={`grid-line-${i}`}
                 style={[
                   styles.gridLine,
                   { bottom: `${20 + i * 20}%` },
@@ -47,10 +47,10 @@ export default function EvolutionChart({ data, title, color }: EvolutionChartPro
           </View>
           
           <View style={styles.barsContainer}>
-            {data.map((d, i) => {
+            {data.map((d) => {
               const height = ((d.value - minValue) / range) * 80;
               return (
-                <View key={i} style={styles.barWrapper}>
+                <View key={`${d.date}-${d.value}`} style={styles.barWrapper}>
                   <View style={[styles.bar, { height: Math.max(height, 2), backgroundColor: chartColor }]} />
                 </View>
               );
@@ -58,8 +58,8 @@ export default function EvolutionChart({ data, title, color }: EvolutionChartPro
           </View>
           
           <View style={styles.xAxis}>
-            {data.filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1).map((d, i) => (
-              <Text key={i} style={[styles.axisLabel, { color: colors.textMuted }]}>
+            {data.filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1).map((d) => (
+              <Text key={`axis-${d.date}`} style={[styles.axisLabel, { color: colors.textMuted }]}>
                 {d.date.split("-")[2]}
               </Text>
             ))}

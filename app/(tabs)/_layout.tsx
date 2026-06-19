@@ -4,8 +4,103 @@ import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@/hooks/useApi";
 import { Tabs } from "expo-router";
+import type { ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Image, View } from "react-native";
+
+type Role = "PLAYER" | "COACH" | "SCOUT";
+type IconName = ComponentProps<typeof Ionicons>["name"];
+type TabIconProps = Readonly<{
+  color: string;
+  size: number;
+  focused: boolean;
+}>;
+
+type TabIconSwitcherProps = TabIconProps &
+  Readonly<{
+    focusedIcon: IconName;
+    unfocusedIcon: IconName;
+  }>;
+
+type ProfileTabIconProps = TabIconProps &
+  Readonly<{
+    avatarUrl?: string;
+  }>;
+
+function getRole(accountType: string | null | undefined, fallbackRole: Role | undefined): Role {
+  if (accountType === "JOGADOR") return "PLAYER";
+  if (accountType === "TREINADOR") return "COACH";
+  if (accountType === "OLHEIRO") return "SCOUT";
+  return fallbackRole || "PLAYER";
+}
+
+function TabIconSwitcher({
+  color,
+  size,
+  focused,
+  focusedIcon,
+  unfocusedIcon,
+}: TabIconSwitcherProps) {
+  return (
+    <Ionicons
+      name={focused ? focusedIcon : unfocusedIcon}
+      color={color}
+      size={size}
+    />
+  );
+}
+
+function createTabIcon(focusedIcon: IconName, unfocusedIcon: IconName) {
+  return function TabIcon(props: TabIconProps) {
+    return (
+      <TabIconSwitcher
+        {...props}
+        focusedIcon={focusedIcon}
+        unfocusedIcon={unfocusedIcon}
+      />
+    );
+  };
+}
+
+function ProfileTabIcon({ avatarUrl, color, size, focused }: ProfileTabIconProps) {
+  if (avatarUrl) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth: 1,
+          borderColor: color,
+        }}
+      />
+    );
+  }
+
+  return (
+    <Ionicons
+      name={focused ? "person" : "person-outline"}
+      color={color}
+      size={size}
+    />
+  );
+}
+
+function createProfileTabIcon(avatarUrl?: string) {
+  return function ProfileIcon(props: TabIconProps) {
+    return <ProfileTabIcon {...props} avatarUrl={avatarUrl} />;
+  };
+}
+
+const dashboardIcon = createTabIcon("stats-chart", "stats-chart-outline");
+const workoutsIcon = createTabIcon("barbell", "barbell-outline");
+const gamesIcon = createTabIcon("football", "football-outline");
+const teamIcon = createTabIcon("people", "people-outline");
+const planningIcon = createTabIcon("calendar", "calendar-outline");
+const analysisIcon = createTabIcon("bar-chart", "bar-chart-outline");
+const rankingsIcon = createTabIcon("trophy", "trophy-outline");
+const chatIcon = createTabIcon("chatbubbles", "chatbubbles-outline");
 
 const TabsLayout = () => {
   const { user, isLoading, accountType } = useAuth();
@@ -28,10 +123,7 @@ const TabsLayout = () => {
     return null;
   }
 
-  const role = accountType === "JOGADOR" ? "PLAYER" : 
-               accountType === "TREINADOR" ? "COACH" : 
-               accountType === "OLHEIRO" ? "SCOUT" : 
-               convexUser?.role || "PLAYER";
+  const role = getRole(accountType, convexUser?.role);
 
   return (
     <Tabs
@@ -59,9 +151,7 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.dashboard"),
           href: (role === "PLAYER" || role === "SCOUT") ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: dashboardIcon,
         }}
       />
       <Tabs.Screen
@@ -69,9 +159,7 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.treinos"),
           href: role === "PLAYER" ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "barbell" : "barbell-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: workoutsIcon,
         }}
       />
       <Tabs.Screen
@@ -79,9 +167,7 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.jogos"),
           href: role === "COACH" ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "football" : "football-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: gamesIcon,
         }}
       />
       <Tabs.Screen
@@ -89,9 +175,7 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.equipa"),
           href: role === "COACH" ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "people" : "people-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: teamIcon,
         }}
       />
       <Tabs.Screen
@@ -99,9 +183,7 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.planeamento"),
           href: role === "COACH" ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "calendar" : "calendar-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: planningIcon,
         }}
       />
       <Tabs.Screen
@@ -109,18 +191,14 @@ const TabsLayout = () => {
         options={{
           title: t("tabs.analise"),
           href: role === "COACH" ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: analysisIcon,
         }}
       />
       <Tabs.Screen
         name="rankings"
         options={{
           title: "Rankings",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "trophy" : "trophy-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: rankingsIcon,
         }}
       />
       <Tabs.Screen
@@ -133,30 +211,14 @@ const TabsLayout = () => {
         name="chat"
         options={{
           title: t("tabs.messages"),
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} color={color} size={size} />
-          ),
+          tabBarIcon: chatIcon,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t("tabs.profile"),
-          tabBarIcon: ({ color, size, focused }) =>
-            user?.avatar_url ? (
-              <Image
-                source={{ uri: user.avatar_url }}
-                style={{
-                  width: size,
-                  height: size,
-                  borderRadius: size / 2,
-                  borderWidth: 1,
-                  borderColor: color,
-                }}
-              />
-            ) : (
-              <Ionicons name={focused ? "person" : "person-outline"} color={color} size={size} />
-            ),
+          tabBarIcon: createProfileTabIcon(user?.avatar_url),
         }}
       />
     </Tabs>

@@ -17,10 +17,77 @@ import {
   View,
 } from "react-native";
 
-const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+type LoginFieldProps = {
+  value: string;
+  error?: string;
+  placeholder: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+  onChangeText: (text: string) => void;
+  keyboardType?: "default" | "email-address";
+  secureTextEntry?: boolean;
 };
+
+type LoginErrorKey = "fullName" | "email" | "password" | "confirmPassword";
+type AccountRole = "PLAYER" | "COACH" | "SCOUT";
+
+const isValidEmail = (email: string): boolean => {
+  const trimmedEmail = email.trim();
+  if (trimmedEmail.length > 254 || trimmedEmail.includes(" ")) return false;
+
+  const atIndex = trimmedEmail.indexOf("@");
+  const lastAtIndex = trimmedEmail.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex !== lastAtIndex) return false;
+
+  const domain = trimmedEmail.slice(atIndex + 1);
+  const localPart = trimmedEmail.slice(0, atIndex);
+  const dotIndex = domain.lastIndexOf(".");
+
+  return (
+    localPart.length > 0 &&
+    domain.length > 3 &&
+    dotIndex > 0 &&
+    dotIndex < domain.length - 1 &&
+    !domain.includes(" ")
+  );
+};
+
+function LoginField({
+  value,
+  error,
+  placeholder,
+  colors,
+  onChangeText,
+  keyboardType = "default",
+  secureTextEntry = false,
+}: Readonly<LoginFieldProps>) {
+  return (
+    <>
+      <View
+        style={[
+          styles.inputContainer,
+          { borderColor: error ? colors.danger : colors.border },
+        ]}
+      >
+        <TextInput
+          style={[styles.input, { color: colors.text }]}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={keyboardType}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry={secureTextEntry}
+        />
+      </View>
+      {error && (
+        <Text style={[styles.errorText, { color: colors.danger }]}>
+          {error}
+        </Text>
+      )}
+    </>
+  );
+}
 
 export default function Login() {
   const { colors } = useTheme();
@@ -33,9 +100,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"PLAYER" | "COACH" | "SCOUT">(
-    "PLAYER",
-  );
+  const [selectedRole, setSelectedRole] = useState<AccountRole>("PLAYER");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     fullName?: string;
@@ -55,6 +120,17 @@ export default function Login() {
     if (errors[field]) {
       setErrors((current) => ({ ...current, [field]: undefined }));
     }
+  };
+
+  const updateLoginField = (field: LoginErrorKey, value: string) => {
+    const setters = {
+      fullName: setFullName,
+      email: setEmail,
+      password: setPassword,
+      confirmPassword: setConfirmPassword,
+    };
+    setters[field](value);
+    clearFieldError(field);
   };
 
   const validate = () => {
@@ -107,6 +183,43 @@ export default function Login() {
       setIsLoading(false);
     }
   };
+
+  const loginFields: (Omit<LoginFieldProps, "colors" | "onChangeText"> & {
+    field: LoginErrorKey;
+    visible: boolean;
+  })[] = [
+    {
+      field: "fullName",
+      visible: showSignUp,
+      error: errors.fullName,
+      placeholder: t("auth.fullName"),
+      value: fullName,
+    },
+    {
+      field: "email",
+      visible: true,
+      error: errors.email,
+      keyboardType: "email-address",
+      placeholder: t("auth.email"),
+      value: email,
+    },
+    {
+      field: "password",
+      visible: true,
+      error: errors.password,
+      placeholder: t("auth.password"),
+      secureTextEntry: true,
+      value: password,
+    },
+    {
+      field: "confirmPassword",
+      visible: showSignUp,
+      error: errors.confirmPassword,
+      placeholder: t("auth.confirmPassword"),
+      secureTextEntry: true,
+      value: confirmPassword,
+    },
+  ];
 
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
@@ -178,28 +291,16 @@ export default function Login() {
             )}
             {showSignUp && (
               <>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    { borderColor: errors.fullName ? colors.danger : colors.border },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder={t("auth.fullName")}
-                    placeholderTextColor={colors.textMuted}
-                    value={fullName}
-                    onChangeText={(text) => {
-                      setFullName(text);
-                      clearFieldError("fullName");
-                    }}
-                  />
-                </View>
-                {errors.fullName && (
-                  <Text style={[styles.errorText, { color: colors.danger }]}>
-                    {errors.fullName}
-                  </Text>
-                )}
+                {loginFields
+                  .filter((field) => field.visible && field.field === "fullName")
+                  .map(({ field, visible, ...props }) => (
+                    <LoginField
+                      key={field}
+                      {...props}
+                      colors={colors}
+                      onChangeText={(text) => updateLoginField(field, text)}
+                    />
+                  ))}
 
                 <View style={styles.roleRow}>
                   {[
@@ -241,87 +342,16 @@ export default function Login() {
               </>
             )}
 
-            <View
-              style={[
-                styles.inputContainer,
-                { borderColor: errors.email ? colors.danger : colors.border },
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder={t("auth.email")}
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  clearFieldError("email");
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-            {errors.email && (
-              <Text style={[styles.errorText, { color: colors.danger }]}>
-                {errors.email}
-              </Text>
-            )}
-
-            <View
-              style={[
-                styles.inputContainer,
-                { borderColor: errors.password ? colors.danger : colors.border },
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder={t("auth.password")}
-                placeholderTextColor={colors.textMuted}
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  clearFieldError("password");
-                }}
-                secureTextEntry
-              />
-            </View>
-            {errors.password && (
-              <Text style={[styles.errorText, { color: colors.danger }]}>
-                {errors.password}
-              </Text>
-            )}
-
-            {showSignUp && (
-              <>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    {
-                      borderColor: errors.confirmPassword
-                        ? colors.danger
-                        : colors.border,
-                    },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder={t("auth.confirmPassword")}
-                    placeholderTextColor={colors.textMuted}
-                    value={confirmPassword}
-                    onChangeText={(text) => {
-                      setConfirmPassword(text);
-                      clearFieldError("confirmPassword");
-                    }}
-                    secureTextEntry
-                  />
-                </View>
-                {errors.confirmPassword && (
-                  <Text style={[styles.errorText, { color: colors.danger }]}>
-                    {errors.confirmPassword}
-                  </Text>
-                )}
-              </>
-            )}
+            {loginFields
+              .filter((field) => field.visible && field.field !== "fullName")
+              .map(({ field, visible, ...props }) => (
+                <LoginField
+                  key={field}
+                  {...props}
+                  colors={colors}
+                  onChangeText={(text) => updateLoginField(field, text)}
+                />
+              ))}
 
             <TouchableOpacity
               style={[

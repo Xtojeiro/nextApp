@@ -2,8 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -109,19 +111,23 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const setDarkMode = async (enabled: boolean) => {
+  const setDarkMode = useCallback(async (enabled: boolean) => {
     setIsDarkMode(enabled);
     await AsyncStorage.setItem("darkMode", JSON.stringify(enabled));
-  };
+  }, []);
 
-  const toggleDarkMode = async () => {
+  const toggleDarkMode = useCallback(async () => {
     await setDarkMode(!isDarkMode);
-  };
+  }, [isDarkMode, setDarkMode]);
 
   const colors = isDarkMode ? darkColors : lightColors;
+  const contextValue = useMemo(
+    () => ({ isDarkMode, toggleDarkMode, setDarkMode, colors }),
+    [colors, isDarkMode, setDarkMode, toggleDarkMode],
+  );
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, setDarkMode, colors }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

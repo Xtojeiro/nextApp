@@ -1,7 +1,7 @@
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 interface StatsComparisonProps {
   currentWeek: number;
@@ -21,12 +21,12 @@ export default function StatsComparison({
   label,
   unit = "",
   icon = "fitness",
-}: StatsComparisonProps) {
+}: Readonly<StatsComparisonProps>) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  const weekChange = previousWeek !== 0 ? ((currentWeek - previousWeek) / previousWeek) * 100 : 0;
-  const monthChange = previousMonth !== 0 ? ((currentMonth - previousMonth) / previousMonth) * 100 : 0;
+  const weekChange = previousWeek === 0 ? 0 : ((currentWeek - previousWeek) / previousWeek) * 100;
+  const monthChange = previousMonth === 0 ? 0 : ((currentMonth - previousMonth) / previousMonth) * 100;
 
   const getChangeColor = (change: number) => {
     if (change > 0) return colors.success;

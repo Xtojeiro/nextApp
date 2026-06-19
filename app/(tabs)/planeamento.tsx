@@ -186,6 +186,7 @@ export default function Planeamento() {
     }
   };
 
+
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
       <StatusBar barStyle={colors.statusBarStyle} />

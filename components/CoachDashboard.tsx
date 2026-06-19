@@ -26,7 +26,7 @@ interface CoachDashboardProps {
   colors: any;
 }
 
-const CoachDashboard: React.FC<CoachDashboardProps> = ({
+const CoachDashboard: React.FC<Readonly<CoachDashboardProps>> = ({
   coachDashboard,
   teamAthletes,
   colors,
@@ -134,12 +134,12 @@ function StatCard({
   value,
   color,
   colors,
-}: {
+}: Readonly<{
   label: string;
   value: number;
   color: string;
   colors: any;
-}) {
+}>) {
   return (
     <View
       style={{

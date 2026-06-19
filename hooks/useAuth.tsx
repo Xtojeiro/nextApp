@@ -5,10 +5,13 @@ import { useQuery } from "convex/react";
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useMemo,
   useState,
 } from "react";
+
+type UserRole = "PLAYER" | "COACH" | "SCOUT";
 
 interface User {
   id: string;
@@ -16,7 +19,7 @@ interface User {
   email: string;
   full_name: string;
   fullName?: string;
-  role: "PLAYER" | "COACH" | "SCOUT";
+  role: UserRole;
   avatar?: string;
   avatar_url?: string;
   profileImageBase64?: string;
@@ -41,7 +44,7 @@ interface AuthContextType {
     email: string,
     password: string,
     confirmPassword: string,
-    role: "PLAYER" | "COACH" | "SCOUT",
+    role: UserRole,
   ) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -93,11 +96,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isLoading = isAuthLoading || (isAuthenticated && convexUser === undefined);
   const isSignedIn = Boolean(isAuthenticated && user);
 
-  const accountType = user
-    ? ROLE_TO_ACCOUNT_TYPE[user.role] || "JOGADOR"
-    : null;
+  const accountType = user ? ROLE_TO_ACCOUNT_TYPE[user.role] || "JOGADOR" : null;
 
-  const login = async (email: string, password: string): Promise<AuthActionResult> => {
+  const login = useCallback(async (email: string, password: string): Promise<AuthActionResult> => {
     setAuthError(null);
     try {
       await signIn("password", {
@@ -111,14 +112,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAuthError(message);
       return { ok: false, error: message };
     }
-  };
+  }, [signIn]);
 
-  const register = async (
+  const register = useCallback(async (
     fullName: string,
     email: string,
     password: string,
     confirmPassword: string,
-    role: "PLAYER" | "COACH" | "SCOUT" = "PLAYER",
+    role: UserRole = "PLAYER",
   ): Promise<AuthActionResult> => {
     setAuthError(null);
     if (password !== confirmPassword) {
@@ -141,35 +142,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAuthError(message);
       return { ok: false, error: message };
     }
-  };
+  }, [signIn]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await signOut();
     setAuthError(null);
-  };
+  }, [signOut]);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     setAuthError(null);
-  };
+  }, []);
 
-  const clearAuthError = () => {
+  const clearAuthError = useCallback(() => {
     setAuthError(null);
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      user,
+      accountType,
+      isLoading,
+      isSignedIn,
+      authError,
+      login,
+      register,
+      logout,
+      refreshUser,
+      clearAuthError,
+    }),
+    [
+      accountType,
+      authError,
+      clearAuthError,
+      isLoading,
+      isSignedIn,
+      login,
+      logout,
+      refreshUser,
+      register,
+      user,
+    ],
+  );
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        accountType,
-        isLoading,
-        isSignedIn,
-        authError,
-        login,
-        register,
-        logout,
-        refreshUser,
-        clearAuthError,
-      }}
+      value={contextValue}
     >
       {children}
     </AuthContext.Provider>

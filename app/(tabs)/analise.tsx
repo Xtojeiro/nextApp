@@ -14,6 +14,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type PerformancePeriod = "week" | "month" | "quarter";
+
+function getPeriodLabel(period: PerformancePeriod) {
+  switch (period) {
+    case "week":
+      return "Semana";
+    case "month":
+      return "Mês";
+    case "quarter":
+      return "Trimestre";
+  }
+}
+
 export default function Analise() {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -70,7 +83,7 @@ export default function Analise() {
     },
   ];
 
-  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "quarter">("month");
+  const [selectedPeriod, setSelectedPeriod] = useState<PerformancePeriod>("month");
 
   // Only show for COACH role
   if (convexUser?.role !== "COACH") {
@@ -188,6 +201,9 @@ export default function Analise() {
   const averageScore = Math.round(
     performanceData.reduce((sum, athlete) => sum + athlete.progressScore, 0) / performanceData.length
   );
+  const sortedPerformanceData = [...performanceData].sort(
+    (a, b) => b.progressScore - a.progressScore,
+  );
 
   return (
     <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
@@ -233,7 +249,7 @@ export default function Analise() {
                     fontSize: 14,
                   }}
                 >
-                  {period === "week" ? "Semana" : period === "month" ? "Mês" : "Trimestre"}
+                  {getPeriodLabel(period)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -330,9 +346,7 @@ export default function Analise() {
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
               Desempenho Individual
             </Text>
-            {performanceData
-              .sort((a, b) => b.progressScore - a.progressScore)
-              .map(renderAthleteCard)}
+            {sortedPerformanceData.map(renderAthleteCard)}
           </View>
         </ScrollView>
       </SafeAreaView>

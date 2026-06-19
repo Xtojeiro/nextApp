@@ -1,6 +1,6 @@
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "react-i18next";
+import { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView } from "react-native";
 
 interface ReportData {
@@ -27,9 +27,16 @@ interface PDFReportGeneratorProps {
   onExport?: (format: "pdf" | "csv") => void;
 }
 
-export default function PDFReportGenerator({ data, onExport }: PDFReportGeneratorProps) {
+const includedReportSections = [
+  "Resumo da equipa",
+  "Estatísticas individuais",
+  "Comparação de desempenho",
+  "Gráficos de evolução",
+  "Top 10 atletas",
+];
+
+export default function PDFReportGenerator({ data, onExport }: Readonly<PDFReportGeneratorProps>) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
   const [showPreview, setShowPreview] = useState(false);
 
   const formatValue = (value: number) => {
@@ -101,14 +108,8 @@ export default function PDFReportGenerator({ data, onExport }: PDFReportGenerato
       <View style={styles.infoSection}>
         <Text style={[styles.infoTitle, { color: colors.text }]}>Incluir no relatório:</Text>
         <View style={styles.checklist}>
-          {[
-            "Resumo da equipa",
-            "Estatísticas individuais",
-            "Comparação de desempenho",
-            "Gráficos de evolução",
-            "Top 10 atletas",
-          ].map((item, index) => (
-            <View key={index} style={styles.checkItem}>
+          {includedReportSections.map((item) => (
+            <View key={item} style={styles.checkItem}>
               <Ionicons name="checkbox" size={18} color={colors.success} />
               <Text style={[styles.checkText, { color: colors.text }]}>{item}</Text>
             </View>
@@ -156,7 +157,7 @@ export default function PDFReportGenerator({ data, onExport }: PDFReportGenerato
                 <View style={styles.previewSection}>
                   <Text style={styles.previewSectionTitle}>Top 5 Atletas</Text>
                   {data.athletes.slice(0, 5).map((athlete, index) => (
-                    <View key={index} style={styles.previewAthlete}>
+                    <View key={athlete.name} style={styles.previewAthlete}>
                       <Text style={styles.previewRank}>#{index + 1}</Text>
                       <Text style={styles.previewName}>{athlete.name}</Text>
                       <Text style={styles.previewStats}>
@@ -191,8 +192,6 @@ export default function PDFReportGenerator({ data, onExport }: PDFReportGenerato
     </View>
   );
 }
-
-import { useState } from "react";
 
 const styles = StyleSheet.create({
   container: {

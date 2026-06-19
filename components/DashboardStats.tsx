@@ -19,7 +19,7 @@ export default function DashboardStats({
   bestStreak,
   onWorkoutPress,
   onGamePress,
-}: DashboardStatsProps) {
+}: Readonly<DashboardStatsProps>) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 

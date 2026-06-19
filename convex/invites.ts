@@ -1,29 +1,33 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSessionUser } from "./authHelpers";
 
 export const createInvite = mutation({
   args: {
+    sessionUserId: v.id("users"),
     athleteId: v.id("users"),
     message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
+      throw new Error("Only coaches can send invites");
     }
 
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
+    const coachProfile = await ctx.db
+      .query("coaches")
+      .withIndex("by_userId", (q) => q.eq("userId", coach._id))
       .first();
-
-    if (!coach || coach.role !== "COACH") {
-      throw new Error("Only coaches can send invites");
+    if (!coachProfile?.teamId) {
+      throw new Error("Coach must have a team before sending invites");
     }
 
     const athlete = await ctx.db.get(args.athleteId);
     if (!athlete) {
       throw new Error("Athlete not found");
+    }
+    if (athlete.role !== "PLAYER") {
+      throw new Error("Only players can be invited to a team");
     }
 
     const existingInvite = await ctx.db
@@ -36,7 +40,7 @@ export const createInvite = mutation({
       )
       .first();
 
-    if (existingInvite && existingInvite.status === "pending") {
+    if (existingInvite?.status === "pending") {
       throw new Error("Invite already sent");
     }
 
@@ -53,21 +57,11 @@ export const createInvite = mutation({
 });
 
 export const getPendingInvites = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+  args: {
+    sessionUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionUserId);
 
     if (user.role === "COACH") {
       const invites = await ctx.db
@@ -121,23 +115,12 @@ export const getPendingInvites = query({
 
 export const respondToInvite = mutation({
   args: {
+    sessionUserId: v.id("users"),
     inviteId: v.id("invites"),
     accept: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const user = await requireSessionUser(ctx, args.sessionUserId);
 
     const invite = await ctx.db.get(args.inviteId);
     if (!invite) {
@@ -162,17 +145,19 @@ export const respondToInvite = mutation({
         .withIndex("by_userId", (q) => q.eq("userId", user._id))
         .first();
 
-      if (playerProfile) {
-        const coachProfile = await ctx.db
-          .query("coaches")
-          .withIndex("by_userId", (q) => q.eq("userId", invite.coachId))
-          .first();
+      const coachProfile = await ctx.db
+        .query("coaches")
+        .withIndex("by_userId", (q) => q.eq("userId", invite.coachId))
+        .first();
+      if (!coachProfile?.teamId) {
+        throw new Error("Coach team not found");
+      }
 
-        if (coachProfile) {
-          await ctx.db.patch(playerProfile._id, {
-            coachId: invite.coachId,
-          });
-        }
+      if (playerProfile && coachProfile) {
+        await ctx.db.patch(playerProfile._id, {
+          coachId: invite.coachId,
+          teamId: coachProfile.teamId,
+        });
       }
     }
 
@@ -181,19 +166,12 @@ export const respondToInvite = mutation({
 });
 
 export const getCoachInvites = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const coach = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!coach || coach.role !== "COACH") {
+  args: {
+    sessionUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const coach = await requireSessionUser(ctx, args.sessionUserId);
+    if (coach.role !== "COACH") {
       throw new Error("Only coaches can view their invites");
     }
 

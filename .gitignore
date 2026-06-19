@@ -37,6 +37,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+coverage/
 
 app-example
 
@@ -48,3 +49,4 @@ app-example
 token.md
 
 /.codex-run
+/reports

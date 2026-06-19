@@ -6,9 +6,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password<DataModel>({
       profile(params: Record<string, unknown>) {
-        const email = String(params.email || "").toLowerCase();
-        const fullName = String(params.name || email || "User").trim();
-        const rawRole = String(params.role || "PLAYER").toUpperCase();
+        const emailParam = typeof params.email === "string" ? params.email : "";
+        const nameParam = typeof params.name === "string" ? params.name : "";
+        const roleParam = typeof params.role === "string" ? params.role : "PLAYER";
+        const email = emailParam.toLowerCase();
+        const fullName = (nameParam || email || "User").trim();
+        const rawRole = roleParam.toUpperCase();
         const role =
           rawRole === "COACH" || rawRole === "SCOUT" ? rawRole : "PLAYER";
         const now = Date.now();

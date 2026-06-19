@@ -32,7 +32,7 @@ export default function UnifiedCalendar({
   games,
   onEventPress,
   onAddEvent,
-}: UnifiedCalendarProps) {
+}: Readonly<UnifiedCalendarProps>) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -128,15 +128,16 @@ export default function UnifiedCalendar({
       </View>
 
       <View style={styles.weekDays}>
-        {["D", "S", "T", "Q", "Q", "S", "S"].map((day, i) => (
-          <Text key={i} style={[styles.weekDay, { color: colors.textMuted }]}>
-            {day}
+        {["dom", "seg", "ter", "qua", "qui", "sex", "sab"].map((day) => (
+          <Text key={day} style={[styles.weekDay, { color: colors.textMuted }]}>
+            {day.charAt(0).toUpperCase()}
           </Text>
         ))}
       </View>
 
       <View style={styles.calendarGrid}>
         {getDaysInMonth(currentMonth).map((day, index) => {
+          const calendarKey = day === null ? `empty-${index}` : formatDate(day);
           const dateStr = formatDate(day);
           const dayItems = getItemsForDate(dateStr);
           const hasItems = dayItems.length > 0;
@@ -144,7 +145,7 @@ export default function UnifiedCalendar({
 
           return (
             <TouchableOpacity
-              key={index}
+              key={calendarKey}
               style={[
                 styles.dayCell,
                 day === null && styles.emptyDay,
@@ -162,16 +163,16 @@ export default function UnifiedCalendar({
                       hasItems && { fontWeight: "bold" },
                     ]}
                   >
-                    {day}
-                  </Text>
+            {day}
+          </Text>
                   {hasItems && (
                     <View style={styles.itemIndicators}>
-                      {dayItems.slice(0, 3).map((_, i) => (
+                      {dayItems.slice(0, 3).map((item) => (
                         <View
-                          key={i}
+                          key={item.id}
                           style={[
                             styles.indicator,
-                            { backgroundColor: getTypeColor(dayItems[i].type) },
+                            { backgroundColor: getTypeColor(item.type) },
                           ]}
                         />
                       ))}

@@ -51,6 +51,28 @@ export const getWorkouts = query({
       .withIndex("by_user_id", (q) => q.eq("user_id", user._id))
       .collect();
 
+    const eventBackedKeys = new Set(
+      workouts
+        .filter((workout) => workout.eventId)
+        .map((workout) => getWorkoutIdentityKey(workout)),
+    );
+    workouts = workouts.filter((workout) => {
+      if (workout.eventId) return true;
+      return !eventBackedKeys.has(getWorkoutIdentityKey(workout));
+    });
+
+    const workoutsBySource = new Map<string, (typeof workouts)[number]>();
+    workouts.forEach((workout) => {
+      const sourceKey = workout.eventId
+        ? `event:${workout.eventId}`
+        : `workout:${workout._id}`;
+      const current = workoutsBySource.get(sourceKey);
+      if (!current || workout.created_at > current.created_at) {
+        workoutsBySource.set(sourceKey, workout);
+      }
+    });
+    workouts = Array.from(workoutsBySource.values());
+
     if (args.status) {
       workouts = workouts.filter((workout) => workout.status === args.status);
     }
@@ -59,6 +81,18 @@ export const getWorkouts = query({
     return workouts.slice(0, args.limit || 50);
   },
 });
+
+function getWorkoutIdentityKey(workout: {
+  name: string;
+  scheduledDate?: number;
+  duration_minutes?: number;
+}) {
+  return [
+    workout.name.trim().toLowerCase(),
+    workout.scheduledDate ?? "unscheduled",
+    workout.duration_minutes ?? "unknown",
+  ].join(":");
+}
 
 export const createWorkout = mutation({
   args: {
