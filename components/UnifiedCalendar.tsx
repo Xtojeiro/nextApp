@@ -1,6 +1,6 @@
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   View,
@@ -27,6 +27,8 @@ interface UnifiedCalendarProps {
   onAddEvent?: (event: Partial<CalendarEvent>) => void;
 }
 
+const initialCalendarMonth = new Date(2000, 0, 1);
+
 export default function UnifiedCalendar({
   events,
   games,
@@ -36,7 +38,11 @@ export default function UnifiedCalendar({
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(initialCalendarMonth);
+
+  useEffect(() => {
+    setCurrentMonth(new Date());
+  }, []);
 
   const allItems = [...events, ...games].sort(
     (a, b) => new Date(a.date + "T" + a.start_time).getTime() - new Date(b.date + "T" + b.start_time).getTime()

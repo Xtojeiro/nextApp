@@ -1,6 +1,6 @@
 import useAuth, { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
-import "@/utils/i18n";
+import { useInitializeI18n } from "@/utils/i18n";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import { Stack, usePathname, useRouter } from "expo-router";
@@ -63,6 +63,8 @@ function RootLayoutNav() {
 }
 
 export default function Layout() {
+  useInitializeI18n();
+
   return (
     <ConvexAuthProvider
       client={convex}
