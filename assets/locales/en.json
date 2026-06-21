@@ -74,13 +74,37 @@
   "tabs": {
     "dashboard": "Dashboard",
     "treinos": "Treinos",
+    "jogos": "Games",
+    "planeamento": "Planning",
+    "analise": "Analysis",
     "messages": "Messages",
     "profile": "Profile",
-    "equipa": "Team"
+    "equipa": "Team",
+    "rankings": "Rankings"
   },
   "feed": {
     "title": "Feed",
     "subtitle": "Latest updates from the club"
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Top performers this season",
+    "goals": "Goals",
+    "assists": "Assists",
+    "games": "Games",
+    "points": "Points",
+    "rebounds": "Rebounds",
+    "gamesPlayed_one": "{{count}} game",
+    "gamesPlayed_other": "{{count}} games",
+    "valueLabels": {
+      "goals": "goals",
+      "assists": "assists",
+      "games": "games",
+      "points": "pts",
+      "rebounds": "reb"
+    },
+    "noRankings": "No Rankings Yet",
+    "noRankingsSubtitle": "Rankings will appear here once players have recorded game statistics."
   },
   "treinos": {
     "title": "Treinos",
@@ -133,6 +157,13 @@
     "discoverSubtitle": "Search players, coaches, and scouts and manage your connections.",
     "searchPlaceholder": "Search users...",
     "emptySearch": "No users found.",
+    "editProfile": "Edit Profile",
+    "bio": "Bio",
+    "namePlaceholder": "Enter your name",
+    "bioPlaceholder": "Enter your bio",
+    "changePicture": "Change Picture",
+    "followers": "Followers",
+    "following": "Following",
     "follow": "Follow",
     "unfollow": "Unfollow",
     "message": "Message",
@@ -191,6 +222,100 @@
     "pointsEvolution": "Points Evolution",
     "performance": "Performance"
   },
+  "scoutDashboard": {
+    "title": "Scout dashboard",
+    "subtitle": "Track athletes, scouting reports, and team meetings in one place.",
+    "kpis": {
+      "observed": "Observed athletes",
+      "reports": "Reports created",
+      "meetings": "Upcoming meetings"
+    },
+    "actions": {
+      "newReport": "New report",
+      "newMeeting": "New meeting",
+      "addPlayer": "Add player",
+      "addReport": "Add report"
+    },
+    "sections": {
+      "athletes": "Athletes to scout",
+      "reports": "Recent reports",
+      "meetings": "Meeting agenda"
+    },
+    "empty": {
+      "athletes": "There are no athletes available to scout yet.",
+      "reports": "You have not created any scouting reports yet.",
+      "meetings": "You do not have any upcoming meetings yet.",
+      "playerSearch": "No players found.",
+      "playerSearchHint": "Type at least 2 characters to search players."
+    },
+    "labels": {
+      "athlete": "Athlete",
+      "title": "Title",
+      "position": "Observed position",
+      "rating": "Rating",
+      "strengths": "Strengths",
+      "weaknesses": "Areas to improve",
+      "notes": "Notes",
+      "location": "Location",
+      "date": "Date",
+      "start": "Start",
+      "end": "End",
+      "noLocation": "No location",
+      "noPosition": "No position set"
+    },
+    "eventTypes": {
+      "meeting": "Meeting",
+      "other": "Other"
+    },
+    "placeholders": {
+      "position": "E.g. right winger",
+      "rating": "1 to 5",
+      "strengths": "Pace, decision-making, finishing",
+      "weaknesses": "Physical duels, weaker foot",
+      "notes": "Observation summary and recommendation",
+      "meetingTitle": "Team meeting",
+      "meetingNotes": "Meeting goal, team, or athlete to discuss",
+      "location": "Location or call link",
+      "date": "Select date",
+      "time": "Select"
+    },
+    "searchPlaceholder": "Search by name, team, position, or location",
+    "reportForm": {
+      "title": "Scouting report",
+      "searchPlayer": "Search player by name, team, position, or location",
+      "save": "Save report"
+    },
+    "addPlayerForm": {
+      "title": "Add player",
+      "add": "Add",
+      "added": "Added"
+    },
+    "meetingForm": {
+      "title": "New meeting",
+      "editTitle": "Edit meeting",
+      "save": "Save meeting",
+      "delete": "Delete meeting"
+    },
+    "messages": {
+      "reportCreated": "Report created successfully.",
+      "reportCreateError": "Failed to create report.",
+      "meetingSaved": "Meeting saved.",
+      "meetingSaveError": "Failed to save meeting.",
+      "meetingDeleted": "Meeting deleted.",
+      "meetingDeleteError": "Failed to delete meeting.",
+      "playerAdded": "Player added to the watchlist.",
+      "playerAddError": "Failed to add player."
+    },
+    "validation": {
+      "athleteRequired": "Search and select a player.",
+      "ratingRange": "Rating must be between 1 and 5.",
+      "dateRequired": "Date is required.",
+      "startRequired": "Start time is required.",
+      "endRequired": "End time is required.",
+      "invalidSchedule": "Date and times must be valid.",
+      "endAfterStart": "End time must be after start time."
+    }
+  },
   "common": {
     "loading": "Loading...",
     "error": "Error",
@@ -198,6 +323,8 @@
     "delete": "Delete",
     "edit": "Edit",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "next": "Next",
+    "back": "Back"
   }
 }

@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import { AccountType, ROLE_TO_ACCOUNT_TYPE } from "@/types/user";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
@@ -72,20 +73,6 @@ function mapConvexUser(convexUser: any): User | null {
   };
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    if (
-      error.message.includes("InvalidSecret") ||
-      error.message.includes("InvalidAccountId") ||
-      error.message.includes("AccountNotFound")
-    ) {
-      return "Email ou palavra-passe incorretos.";
-    }
-    return error.message;
-  }
-  return fallback;
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
@@ -108,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       return { ok: true };
     } catch (error) {
-      const message = getErrorMessage(error, "Nao foi possivel iniciar sessao.");
+      const message = getSimpleErrorMessage(error, "Nao foi possivel iniciar sessao.");
       setAuthError(message);
       return { ok: false, error: message };
     }
@@ -138,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       return { ok: true };
     } catch (error) {
-      const message = getErrorMessage(error, "Nao foi possivel criar a conta.");
+      const message = getSimpleErrorMessage(error, "Nao foi possivel criar a conta.");
       setAuthError(message);
       return { ok: false, error: message };
     }

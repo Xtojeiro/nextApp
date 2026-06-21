@@ -197,7 +197,7 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="rankings"
         options={{
-          title: "Rankings",
+          title: t("tabs.rankings"),
           tabBarIcon: rankingsIcon,
         }}
       />

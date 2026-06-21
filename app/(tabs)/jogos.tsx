@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import type { Doc, Id } from "@/utils/apiTypes";
 import { DateTimeField, FormErrorText } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
@@ -191,7 +192,7 @@ export default function Jogos() {
       resetCreateForm();
       Alert.alert("Sucesso", "Jogo criado com sucesso.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao criar jogo.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao criar jogo."));
     }
   };
 
@@ -239,7 +240,7 @@ export default function Jogos() {
         submittedForApproval ? "Resultado enviado para validação." : "Jogo atualizado.",
       );
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao atualizar jogo.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao atualizar jogo."));
     }
   };
 
@@ -261,7 +262,7 @@ export default function Jogos() {
             }
             Alert.alert("Sucesso", "Jogo eliminado.");
           } catch (error) {
-            Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao eliminar jogo.");
+            Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao eliminar jogo."));
           }
         },
       },
@@ -277,7 +278,7 @@ export default function Jogos() {
       });
       Alert.alert("Sucesso", "Resultado aprovado e publicado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao aprovar resultado.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao aprovar resultado."));
     }
   };
 
@@ -290,7 +291,7 @@ export default function Jogos() {
       });
       Alert.alert("Sucesso", "Resultado rejeitado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao rejeitar resultado.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao rejeitar resultado."));
     }
   };
 

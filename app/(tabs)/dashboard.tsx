@@ -1,12 +1,14 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import type { Id } from "@/utils/apiTypes";
-import CoachDashboard from "@/components/CoachDashboard";
+import ScoutDashboard from "@/components/ScoutDashboard";
 import { DateField, FormErrorText, TimeField } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Picker } from "@react-native-picker/picker";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   eventDateTimeErrors,
@@ -352,17 +354,18 @@ function ActivityHeatmap({
 export default function Dashboard() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const convexUser = useQuery(
     api.users.getCurrentUser,
     user ? { sessionUserId: user.id as Id<"users"> } : "skip",
   );
   const workoutLogsQuery = useQuery(
     api.workouts.getWorkoutLogs,
-    convexUser ? { sessionUserId: convexUser._id } : "skip",
+    convexUser?.role === "PLAYER" ? { sessionUserId: convexUser._id } : "skip",
   );
   const eventsQuery = useQuery(
     api.events.getEvents,
-    convexUser ? { sessionUserId: convexUser._id } : "skip",
+    convexUser?.role === "PLAYER" ? { sessionUserId: convexUser._id } : "skip",
   );
   const workoutLogs = (workoutLogsQuery ?? []) as any[];
   const events = (eventsQuery ?? []) as any[];
@@ -370,7 +373,7 @@ export default function Dashboard() {
   const playerStats =
     useQuery(
       api.users.getPlayerStats,
-      convexUser ? { sessionUserId: convexUser._id } : "skip",
+      convexUser?.role === "PLAYER" ? { sessionUserId: convexUser._id } : "skip",
     ) || {
       gamesPlayed: 0,
       wins: 0,
@@ -379,22 +382,6 @@ export default function Dashboard() {
       assists: 0,
       rebounds: 0,
     };
-  const coachDashboard =
-    useQuery(
-      api.users.getCoachDashboard,
-      convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
-    ) || {
-      totalAthletes: 0,
-      recentWorkouts: 0,
-      upcomingEvents: 0,
-      athletes: [],
-    };
-  const teamAthletes =
-    useQuery(
-      api.teams.getTeamAthletes,
-      convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
-    ) || ([] as any[]);
-
   const createEvent = useMutation(api.events.createEvent);
   const updateEvent = useMutation(api.events.updateEvent);
   const deleteEvent = useMutation(api.events.deleteEvent);
@@ -417,18 +404,22 @@ export default function Dashboard() {
       countableEvents.filter((event) => new Date(event.date).getTime() >= weekStart.getTime()).length,
   };
 
+  useEffect(() => {
+    if (convexUser?.role === "COACH") {
+      router.replace("/jogos");
+    }
+  }, [convexUser?.role, router]);
+
   if (!convexUser) {
     return null;
   }
 
   if (convexUser.role === "COACH") {
-    return (
-      <CoachDashboard
-        coachDashboard={coachDashboard}
-        teamAthletes={teamAthletes}
-        colors={colors}
-      />
-    );
+    return null;
+  }
+
+  if (convexUser.role === "SCOUT") {
+    return <ScoutDashboard sessionUserId={convexUser._id} />;
   }
 
   const handleSaveEvent = async (form: EventFormState) => {
@@ -459,7 +450,7 @@ export default function Dashboard() {
       setShowModal(false);
       setEditingEvent(null);
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao guardar evento.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao guardar evento."));
     }
   };
 
@@ -473,7 +464,7 @@ export default function Dashboard() {
       setShowModal(false);
       setEditingEvent(null);
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao eliminar evento.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao eliminar evento."));
     }
   };
 

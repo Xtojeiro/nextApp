@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import type { Doc, Id } from "@/utils/apiTypes";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
@@ -147,7 +148,7 @@ export default function Planeamento() {
       resetModal();
       Alert.alert("Sucesso", selectedPlan ? "Plano atualizado." : "Plano criado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao guardar plano.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao guardar plano."));
     }
   };
 
@@ -168,7 +169,7 @@ export default function Planeamento() {
             }
             Alert.alert("Sucesso", "Plano eliminado.");
           } catch (error) {
-            Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao eliminar plano.");
+            Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao eliminar plano."));
           }
         },
       },

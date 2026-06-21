@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import type { Id } from "@/utils/apiTypes";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
@@ -180,7 +181,7 @@ export default function Equipa() {
         setShowAssociateModal(false);
         Alert.alert("Equipa associada", `Ficaste associado à equipa ${nextTeam.name}.`);
       } catch (error) {
-        Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao associar equipa.");
+        Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao associar equipa."));
       } finally {
         setAssociatingTeamId(null);
       }
@@ -221,7 +222,7 @@ export default function Equipa() {
       setShowAssociateModal(false);
       Alert.alert("Equipa criada", "A nova equipa foi criada e associada à tua conta.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao criar equipa.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao criar equipa."));
     } finally {
       setCreatingTeam(false);
     }
@@ -238,7 +239,7 @@ export default function Equipa() {
       });
       Alert.alert("Convite enviado", "O jogador recebeu o convite para se juntar à equipa.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao enviar convite.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao enviar convite."));
     } finally {
       setSendingInviteId(null);
     }
@@ -263,7 +264,7 @@ export default function Equipa() {
         "A nota foi validada pelo backend. O modelo atual ainda não persiste estas notas na ficha do atleta.",
       );
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao guardar nota.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao guardar nota."));
     }
   };
 

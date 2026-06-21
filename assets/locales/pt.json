@@ -35,9 +35,9 @@
   "welcome": {
     "kicker": "NextApp Sports",
     "title": "A tua equipa sempre ligada",
-    "subtitle": "Acompanha treinos, jogos, estatisticas e comunicacao entre jogadores, treinadores e olheiros num unico lugar.",
-    "training": "Organiza treinos e acompanha evolucao",
-    "analytics": "Consulta estatisticas e desempenho",
+    "subtitle": "Acompanha treinos, jogos, estatísticas e comunicação entre jogadores, treinadores e olheiros num único lugar.",
+    "training": "Organiza treinos e acompanha evolução",
+    "analytics": "Consulta estatísticas e desempenho",
     "teams": "Liga jogadores, equipas e olheiros",
     "login": "Entrar",
     "register": "Criar conta"
@@ -74,9 +74,13 @@
   "tabs": {
     "dashboard": "Dashboard",
     "treinos": "Treinos",
+    "jogos": "Jogos",
+    "planeamento": "Planeamento",
+    "analise": "Análise",
     "messages": "Mensagens",
     "profile": "Perfil",
-    "equipa": "Equipa"
+    "equipa": "Equipa",
+    "rankings": "Rankings"
   },
   "feed": {
     "title": "Feed",
@@ -101,12 +105,21 @@
     "games": "Jogos",
     "points": "Pontos",
     "rebounds": "Rebatimentos",
+    "gamesPlayed_one": "{{count}} jogo",
+    "gamesPlayed_other": "{{count}} jogos",
+    "valueLabels": {
+      "goals": "golos",
+      "assists": "assist.",
+      "games": "jogos",
+      "points": "pts",
+      "rebounds": "reb"
+    },
     "noRankings": "Ainda sem Rankings",
     "noRankingsSubtitle": "Os rankings aparecerão aqui quando os jogadores tiverem estatísticas registadas."
   },
   "treinos": {
     "title": "Treinos",
-    "subtitle": "Gerenciar e visualizar sessões de treino",
+    "subtitle": "Gerir e visualizar sessões de treino",
     "newWorkout": "Novo Treino",
     "search": "Pesquisar por nome",
     "filterType": "Tipo de treino",
@@ -152,9 +165,16 @@
   },
   "profile": {
     "discoverUsers": "Descobrir utilizadores",
-    "discoverSubtitle": "Procura atletas, treinadores e olheiros e gere as tuas ligacoes.",
+    "discoverSubtitle": "Procura atletas, treinadores e olheiros e gere as tuas ligações.",
     "searchPlaceholder": "Pesquisar utilizadores...",
     "emptySearch": "Nenhum utilizador encontrado.",
+    "editProfile": "Editar perfil",
+    "bio": "Bio",
+    "namePlaceholder": "Introduz o teu nome",
+    "bioPlaceholder": "Introduz a tua bio",
+    "changePicture": "Alterar foto",
+    "followers": "Seguidores",
+    "following": "A seguir",
     "follow": "Seguir",
     "unfollow": "Deixar de seguir",
     "message": "Mensagem",
@@ -232,13 +252,107 @@
     "pointsEvolution": "Evolução de Pontos",
     "performance": "Desempenho"
   },
+  "scoutDashboard": {
+    "title": "Dashboard do olheiro",
+    "subtitle": "Acompanha atletas, relatórios de observação e reuniões com equipas num só lugar.",
+    "kpis": {
+      "observed": "Atletas observados",
+      "reports": "Relatórios criados",
+      "meetings": "Reuniões futuras"
+    },
+    "actions": {
+      "newReport": "Novo relatório",
+      "newMeeting": "Nova reunião",
+      "addPlayer": "Adicionar jogador",
+      "addReport": "Adicionar relatório"
+    },
+    "sections": {
+      "athletes": "Atletas para observar",
+      "reports": "Relatórios recentes",
+      "meetings": "Agenda de reuniões"
+    },
+    "empty": {
+      "athletes": "Ainda não há atletas disponíveis para observação.",
+      "reports": "Ainda não criaste relatórios de scout.",
+      "meetings": "Ainda não tens reuniões futuras marcadas.",
+      "playerSearch": "Nenhum jogador encontrado.",
+      "playerSearchHint": "Escreve pelo menos 2 caracteres para procurar jogadores."
+    },
+    "labels": {
+      "athlete": "Atleta",
+      "title": "Título",
+      "position": "Posição observada",
+      "rating": "Avaliação",
+      "strengths": "Pontos fortes",
+      "weaknesses": "Pontos a melhorar",
+      "notes": "Notas",
+      "location": "Local",
+      "date": "Data",
+      "start": "Início",
+      "end": "Fim",
+      "noLocation": "Sem local",
+      "noPosition": "Sem posição definida"
+    },
+    "eventTypes": {
+      "meeting": "Reunião",
+      "other": "Outro"
+    },
+    "placeholders": {
+      "position": "Ex.: Extremo direito",
+      "rating": "1 a 5",
+      "strengths": "Velocidade, tomada de decisão, finalização",
+      "weaknesses": "Duelo físico, pé não dominante",
+      "notes": "Resumo da observação e recomendação",
+      "meetingTitle": "Reunião com equipa",
+      "meetingNotes": "Objetivo da reunião, equipa ou atleta a discutir",
+      "location": "Local ou link da chamada",
+      "date": "Selecionar data",
+      "time": "Selecionar"
+    },
+    "searchPlaceholder": "Pesquisar por nome, equipa, posição ou localização",
+    "reportForm": {
+      "title": "Relatório de scout",
+      "searchPlayer": "Pesquisar jogador por nome, equipa, posição ou localização",
+      "save": "Guardar relatório"
+    },
+    "addPlayerForm": {
+      "title": "Adicionar jogador",
+      "add": "Adicionar",
+      "added": "Adicionado"
+    },
+    "meetingForm": {
+      "title": "Nova reunião",
+      "editTitle": "Editar reunião",
+      "save": "Guardar reunião",
+      "delete": "Eliminar reunião"
+    },
+    "messages": {
+      "reportCreated": "Relatório criado com sucesso.",
+      "reportCreateError": "Falha ao criar relatório.",
+      "meetingSaved": "Reunião guardada.",
+      "meetingSaveError": "Falha ao guardar reunião.",
+      "meetingDeleted": "Reunião eliminada.",
+      "meetingDeleteError": "Falha ao eliminar reunião.",
+      "playerAdded": "Jogador adicionado à lista de observação.",
+      "playerAddError": "Falha ao adicionar jogador."
+    },
+    "validation": {
+      "athleteRequired": "Pesquisa e seleciona um jogador.",
+      "ratingRange": "A avaliação tem de estar entre 1 e 5.",
+      "dateRequired": "Data é obrigatória.",
+      "startRequired": "Hora de início é obrigatória.",
+      "endRequired": "Hora de fim é obrigatória.",
+      "invalidSchedule": "A data e as horas têm de ser válidas.",
+      "endAfterStart": "A hora de fim tem de ser posterior à hora de início."
+    }
+  },
   "common": {
-    "loading": "Carregando...",
+    "loading": "A carregar...",
     "error": "Erro",
     "success": "Sucesso",
     "delete": "Apagar",
     "edit": "Editar",
-    "save": "Salvar",
+    "save": "Guardar",
     "cancel": "Cancelar",
     "next": "Seguinte",
     "back": "Voltar"

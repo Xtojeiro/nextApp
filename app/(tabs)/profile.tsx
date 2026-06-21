@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
@@ -443,8 +444,8 @@ export default function Profile() {
       Alert.alert(t("common.success"), t("settings.security.changePassword"));
     } catch (error) {
       Alert.alert(
-        "Error",
-        error instanceof Error ? error.message : "Failed to change password",
+        "Erro",
+        getSimpleErrorMessage(error, "Falha ao alterar palavra-passe."),
       );
     } finally {
       setPasswordLoading(false);
@@ -535,7 +536,7 @@ export default function Profile() {
       });
       Alert.alert("Sucesso", accept ? "Pedido aceite." : "Pedido rejeitado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao responder ao pedido.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao responder ao pedido."));
     }
   };
 
@@ -572,7 +573,7 @@ export default function Profile() {
       });
       Alert.alert("Sucesso", accept ? "Convite aceite." : "Convite rejeitado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao responder ao convite.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao responder ao convite."));
     }
   };
 
@@ -621,17 +622,23 @@ export default function Profile() {
               setEditModalVisible(true);
             }}
           >
-            <Text style={[styles.editButtonText, { color: colors.surface }]}>Edit Profile</Text>
+            <Text style={[styles.editButtonText, { color: colors.surface }]}>
+              {t("profile.editProfile")}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.stats}>
             <View style={styles.stat}>
               <Text style={[styles.statNumber, { color: colors.text }]}>{followersCount || 0}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Followers</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                {t("profile.followers")}
+              </Text>
             </View>
             <View style={styles.stat}>
               <Text style={[styles.statNumber, { color: colors.text }]}>{followingCount || 0}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Following</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                {t("profile.following")}
+              </Text>
             </View>
           </View>
         </View>
@@ -995,21 +1002,6 @@ export default function Profile() {
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
-              {["Push Notifications", "Game Reminders", "Training Reminders", "New Messages", "New Followers"].map((label) => (
-                <TouchableOpacity key={label} style={styles.settingRow}>
-                  <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
-                  <Ionicons name="toggle" size={32} color={colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View
-              style={[
-                styles.section,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 {t("settings.account.title")}
               </Text>
@@ -1157,13 +1149,19 @@ export default function Profile() {
             <TouchableOpacity onPress={() => setEditModalVisible(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Profile</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t("profile.editProfile")}
+            </Text>
             <TouchableOpacity onPress={handleEditProfile}>
-              <Text style={[styles.saveText, { color: colors.primary }]}>Save</Text>
+              <Text style={[styles.saveText, { color: colors.primary }]}>
+                {t("common.save")}
+              </Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1, padding: 16 }}>
-            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("auth.fullName")}
+            </Text>
             <TextInput
               style={[
                 styles.input,
@@ -1175,10 +1173,12 @@ export default function Profile() {
               ]}
               value={editName}
               onChangeText={setEditName}
-              placeholder="Enter your name"
+              placeholder={t("profile.namePlaceholder")}
               placeholderTextColor={colors.textMuted}
             />
-            <Text style={[styles.label, { color: colors.text }]}>Bio</Text>
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("profile.bio")}
+            </Text>
             <TextInput
               style={[
                 styles.input,
@@ -1190,16 +1190,20 @@ export default function Profile() {
               ]}
               value={editBio}
               onChangeText={setEditBio}
-              placeholder="Enter your bio"
+              placeholder={t("profile.bioPlaceholder")}
               placeholderTextColor={colors.textMuted}
               multiline
             />
-            <Text style={[styles.label, { color: colors.text }]}>Profile Picture</Text>
+            <Text style={[styles.label, { color: colors.text }]}>
+              {t("settings.account.profileImage")}
+            </Text>
             <TouchableOpacity
               onPress={handleChangeImage}
               style={[styles.editButton, { backgroundColor: colors.primary }]}
             >
-              <Text style={[styles.editButtonText, { color: colors.surface }]}>Change Picture</Text>
+              <Text style={[styles.editButtonText, { color: colors.surface }]}>
+                {t("profile.changePicture")}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </LinearGradient>

@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FlatList,
   Image,
@@ -30,16 +31,17 @@ interface RankingEntry {
   goals: number;
 }
 
-const TABS: { key: RankingType; label: string; icon: string }[] = [
-  { key: "goals", label: "Goals", icon: "football" },
-  { key: "assists", label: "Assists", icon: "arrow-redo" },
-  { key: "games", label: "Games", icon: "game-controller" },
-  { key: "points", label: "Points", icon: "star" },
-  { key: "rebounds", label: "Rebounds", icon: "basketball" },
+const TABS: { key: RankingType; labelKey: string; valueLabelKey: string; icon: string }[] = [
+  { key: "goals", labelKey: "rankings.goals", valueLabelKey: "rankings.valueLabels.goals", icon: "football" },
+  { key: "assists", labelKey: "rankings.assists", valueLabelKey: "rankings.valueLabels.assists", icon: "arrow-redo" },
+  { key: "games", labelKey: "rankings.games", valueLabelKey: "rankings.valueLabels.games", icon: "game-controller" },
+  { key: "points", labelKey: "rankings.points", valueLabelKey: "rankings.valueLabels.points", icon: "star" },
+  { key: "rebounds", labelKey: "rankings.rebounds", valueLabelKey: "rankings.valueLabels.rebounds", icon: "basketball" },
 ];
 
 export default function Rankings() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<RankingType>("goals");
 
   const goalsRankings = useQuery(api.rankings.getRankingsByGoals, { limit: 20 });
@@ -82,6 +84,15 @@ export default function Rankings() {
     }
   };
 
+  const getActiveTabLabel = () => {
+    return TABS.find((tab) => tab.key === activeTab)?.valueLabelKey || "rankings.valueLabels.goals";
+  };
+
+  const getGamesPlayedLabel = (gamesPlayed: number) => {
+    const key = gamesPlayed === 1 ? "rankings.gamesPlayed_one" : "rankings.gamesPlayed_other";
+    return t(key, { count: gamesPlayed });
+  };
+
   const getRankIcon = (rank: number) => {
     if (rank === 1) return { name: "trophy" as const, color: "#FFD700" };
     if (rank === 2) return { name: "trophy" as const, color: "#C0C0C0" };
@@ -122,7 +133,7 @@ export default function Rankings() {
             {item.fullName}
           </Text>
           <Text style={[styles.playerStats, { color: colors.textMuted }]}>
-            {item.gamesPlayed} games
+            {getGamesPlayedLabel(item.gamesPlayed)}
           </Text>
         </View>
         
@@ -131,11 +142,7 @@ export default function Rankings() {
             {getValue(item)}
           </Text>
           <Text style={[styles.valueLabel, { color: colors.textMuted }]}>
-            {activeTab === "goals" && "goals"}
-            {activeTab === "assists" && "assists"}
-            {activeTab === "games" && "games"}
-            {activeTab === "points" && "pts"}
-            {activeTab === "rebounds" && "reb"}
+            {t(getActiveTabLabel())}
           </Text>
         </View>
       </View>
@@ -146,10 +153,10 @@ export default function Rankings() {
     <View style={styles.emptyContainer}>
       <Ionicons name="trophy-outline" size={80} color={colors.textMuted} />
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        No Rankings Yet
+        {t("rankings.noRankings")}
       </Text>
       <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-        Rankings will appear here once players have recorded game statistics.
+        {t("rankings.noRankingsSubtitle")}
       </Text>
     </View>
   );
@@ -160,10 +167,10 @@ export default function Rankings() {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Rankings
+            {t("rankings.title")}
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-            Top performers this season
+            {t("rankings.subtitle")}
           </Text>
         </View>
 
@@ -193,7 +200,7 @@ export default function Rankings() {
                     { color: activeTab === tab.key ? colors.surface : colors.textMuted },
                   ]}
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </Text>
               </TouchableOpacity>
             ))}

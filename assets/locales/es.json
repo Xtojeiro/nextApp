@@ -35,9 +35,9 @@
   "welcome": {
     "kicker": "NextApp Sports",
     "title": "Tu equipo siempre conectado",
-    "subtitle": "Sigue entrenamientos, partidos, estadisticas y comunicacion entre jugadores, entrenadores y ojeadores en un solo lugar.",
+    "subtitle": "Sigue entrenamientos, partidos, estadísticas y comunicación entre jugadores, entrenadores y ojeadores en un solo lugar.",
     "training": "Organiza entrenamientos y progreso",
-    "analytics": "Consulta estadisticas y rendimiento",
+    "analytics": "Consulta estadísticas y rendimiento",
     "teams": "Conecta jugadores, equipos y ojeadores",
     "login": "Iniciar sesion",
     "register": "Crear cuenta"
@@ -74,15 +74,46 @@
   "tabs": {
     "dashboard": "Panel",
     "treinos": "Entrenamientos",
+    "jogos": "Partidos",
+    "planeamento": "Planificación",
+    "analise": "Análisis",
     "messages": "Mensajes",
     "profile": "Perfil",
-    "equipa": "Equipo"
+    "equipa": "Equipo",
+    "rankings": "Rankings"
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Mejores rendimientos de esta temporada",
+    "goals": "Goles",
+    "assists": "Asistencias",
+    "games": "Partidos",
+    "points": "Puntos",
+    "rebounds": "Rebotes",
+    "gamesPlayed_one": "{{count}} partido",
+    "gamesPlayed_other": "{{count}} partidos",
+    "valueLabels": {
+      "goals": "goles",
+      "assists": "asist.",
+      "games": "partidos",
+      "points": "pts",
+      "rebounds": "reb"
+    },
+    "noRankings": "Aún no hay rankings",
+    "noRankingsSubtitle": "Los rankings aparecerán aquí cuando los jugadores tengan estadísticas de partido registradas."
   },
   "profile": {
     "discoverUsers": "Descubrir usuarios",
     "discoverSubtitle": "Busca jugadores, entrenadores y ojeadores y gestiona tus conexiones.",
     "searchPlaceholder": "Buscar usuarios...",
     "emptySearch": "No se encontraron usuarios.",
+    "editProfile": "Editar perfil",
+    "bio": "Biografía",
+    "namePlaceholder": "Introduce tu nombre",
+    "bioPlaceholder": "Introduce tu biografía",
+    "changePicture": "Cambiar foto",
+    "followers": "Seguidores",
+    "following": "Siguiendo",
     "follow": "Seguir",
     "unfollow": "Dejar de seguir",
     "message": "Mensaje",
@@ -92,5 +123,110 @@
     "followError": "No se pudo seguir al usuario",
     "unfollowSuccess": "Usuario eliminado",
     "unfollowError": "No se pudo dejar de seguir al usuario"
+  },
+  "scoutDashboard": {
+    "title": "Panel del ojeador",
+    "subtitle": "Sigue jugadores, informes de observación y reuniones con equipos en un solo lugar.",
+    "kpis": {
+      "observed": "Jugadores observados",
+      "reports": "Informes creados",
+      "meetings": "Próximas reuniones"
+    },
+    "actions": {
+      "newReport": "Nuevo informe",
+      "newMeeting": "Nueva reunión",
+      "addPlayer": "Añadir jugador",
+      "addReport": "Añadir informe"
+    },
+    "sections": {
+      "athletes": "Jugadores para observar",
+      "reports": "Informes recientes",
+      "meetings": "Agenda de reuniones"
+    },
+    "empty": {
+      "athletes": "Aún no hay jugadores disponibles para observar.",
+      "reports": "Aún no has creado informes de scouting.",
+      "meetings": "Aún no tienes próximas reuniones.",
+      "playerSearch": "No se encontraron jugadores.",
+      "playerSearchHint": "Escribe al menos 2 caracteres para buscar jugadores."
+    },
+    "labels": {
+      "athlete": "Jugador",
+      "title": "Título",
+      "position": "Posición observada",
+      "rating": "Valoración",
+      "strengths": "Puntos fuertes",
+      "weaknesses": "Áreas de mejora",
+      "notes": "Notas",
+      "location": "Lugar",
+      "date": "Fecha",
+      "start": "Inicio",
+      "end": "Fin",
+      "noLocation": "Sin lugar",
+      "noPosition": "Sin posición definida"
+    },
+    "eventTypes": {
+      "meeting": "Reunión",
+      "other": "Otro"
+    },
+    "placeholders": {
+      "position": "Ej.: extremo derecho",
+      "rating": "1 a 5",
+      "strengths": "Velocidad, toma de decisiones, finalización",
+      "weaknesses": "Duelos físicos, pierna menos hábil",
+      "notes": "Resumen de la observación y recomendación",
+      "meetingTitle": "Reunión con equipo",
+      "meetingNotes": "Objetivo de la reunión, equipo o jugador a tratar",
+      "location": "Lugar o enlace de llamada",
+      "date": "Seleccionar fecha",
+      "time": "Seleccionar"
+    },
+    "searchPlaceholder": "Buscar por nombre, equipo, posición o ubicación",
+    "reportForm": {
+      "title": "Informe de scouting",
+      "searchPlayer": "Buscar jugador por nombre, equipo, posición o ubicación",
+      "save": "Guardar informe"
+    },
+    "addPlayerForm": {
+      "title": "Añadir jugador",
+      "add": "Añadir",
+      "added": "Añadido"
+    },
+    "meetingForm": {
+      "title": "Nueva reunión",
+      "editTitle": "Editar reunión",
+      "save": "Guardar reunión",
+      "delete": "Eliminar reunión"
+    },
+    "messages": {
+      "reportCreated": "Informe creado correctamente.",
+      "reportCreateError": "No se pudo crear el informe.",
+      "meetingSaved": "Reunión guardada.",
+      "meetingSaveError": "No se pudo guardar la reunión.",
+      "meetingDeleted": "Reunión eliminada.",
+      "meetingDeleteError": "No se pudo eliminar la reunión.",
+      "playerAdded": "Jugador añadido a la lista de observación.",
+      "playerAddError": "No se pudo añadir el jugador."
+    },
+    "validation": {
+      "athleteRequired": "Busca y selecciona un jugador.",
+      "ratingRange": "La valoración debe estar entre 1 y 5.",
+      "dateRequired": "La fecha es obligatoria.",
+      "startRequired": "La hora de inicio es obligatoria.",
+      "endRequired": "La hora de fin es obligatoria.",
+      "invalidSchedule": "La fecha y las horas deben ser válidas.",
+      "endAfterStart": "La hora de fin debe ser posterior a la hora de inicio."
+    }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "next": "Siguiente",
+    "back": "Atrás"
   }
 }

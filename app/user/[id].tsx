@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { useMutation, useQuery } from "@/hooks/useApi";
@@ -52,7 +53,7 @@ export default function UserProfilePage() {
           : "Agora segues este utilizador.",
       );
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao atualizar seguimento.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao atualizar seguimento."));
     }
   };
 
@@ -70,6 +71,15 @@ export default function UserProfilePage() {
       <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
         <StatusBar barStyle={colors.statusBarStyle} />
         <CenteredState colors={colors} loading text="A carregar perfil..." />
+      </LinearGradient>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+        <StatusBar barStyle={colors.statusBarStyle} />
+        <CenteredState colors={colors} icon="person-circle-outline" text="Perfil indisponível." />
       </LinearGradient>
     );
   }

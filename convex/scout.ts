@@ -1,33 +1,35 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 
 export const getObservedAthletes = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const scout = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
-      .first();
-
+    const scout = await requireSessionUser(ctx, args.sessionUserId);
     if (scout?.role !== "SCOUT") {
       throw new Error("Not authorized");
     }
 
-    const allPlayers = await ctx.db.query("players").collect();
+    const observed = await ctx.db
+      .query("scoutObservedAthletes")
+      .withIndex("by_scoutId", (q) => q.eq("scoutId", scout._id))
+      .collect();
 
     const observedAthletes = await Promise.all(
-      allPlayers.slice(0, args.limit || 50).map(async (player) => {
-        const user = await ctx.db.get(player.userId);
+      observed.slice(0, args.limit || 50).map(async (item) => {
+        const player = await ctx.db
+          .query("players")
+          .withIndex("by_userId", (q) => q.eq("userId", item.athleteId))
+          .first();
+        if (!player) return null;
+        const user = await ctx.db.get(item.athleteId);
         const team = player.teamId ? await ctx.db.get(player.teamId) : null;
         return {
           ...player,
+          observedAt: item.createdAt,
           user: user
             ? {
                 _id: user._id,
@@ -42,7 +44,46 @@ export const getObservedAthletes = query({
       }),
     );
 
-    return observedAthletes;
+    return observedAthletes.filter(Boolean);
+  },
+});
+
+export const addObservedAthlete = mutation({
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+    athleteId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const scout = await requireSessionUser(ctx, args.sessionUserId);
+    if (scout?.role !== "SCOUT") {
+      throw new Error("Only scouts can add observed athletes");
+    }
+
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_userId", (q) => q.eq("userId", args.athleteId))
+      .first();
+    if (!player) {
+      throw new Error("Athlete not found");
+    }
+
+    const existing = await ctx.db
+      .query("scoutObservedAthletes")
+      .withIndex("by_scoutId", (q) => q.eq("scoutId", scout._id))
+      .filter((q) => q.eq(q.field("athleteId"), args.athleteId))
+      .first();
+
+    if (existing) {
+      return { success: true, observedAthleteId: existing._id };
+    }
+
+    const observedAthleteId = await ctx.db.insert("scoutObservedAthletes", {
+      scoutId: scout._id,
+      athleteId: args.athleteId,
+      createdAt: Date.now(),
+    });
+
+    return { success: true, observedAthleteId };
   },
 });
 
@@ -79,6 +120,8 @@ export const getFeaturedAthletes = query({
 
 export const searchAthletesAdvanced = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
+    query: v.optional(v.string()),
     position: v.optional(v.string()),
     minAge: v.optional(v.number()),
     maxAge: v.optional(v.number()),
@@ -86,10 +129,7 @@ export const searchAthletesAdvanced = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    await requireSessionUser(ctx, args.sessionUserId);
 
     let players = await ctx.db.query("players").collect();
 
@@ -99,22 +139,40 @@ export const searchAthletesAdvanced = query({
 
     const users = await Promise.all(
       players.map(async (player) => {
-        const user = await ctx.db.get(player.userId);
-        return { player, user };
+        const [user, team] = await Promise.all([
+          ctx.db.get(player.userId),
+          player.teamId ? ctx.db.get(player.teamId) : null,
+        ]);
+        return { player, team, user };
       }),
     );
 
-    let filtered = users.filter(({ user, player }) => {
+    let filtered = users.filter(({ player, team, user }) => {
       if (!user) return false;
       if (args.minAge !== undefined && (user.age || 0) < args.minAge) return false;
       if (args.maxAge !== undefined && (user.age || 0) > args.maxAge) return false;
       if (args.location && !user.location?.toLowerCase().includes(args.location.toLowerCase()))
         return false;
+      if (args.query?.trim()) {
+        const search = args.query.trim().toLowerCase();
+        const searchable = [
+          user.full_name,
+          user.name,
+          user.email,
+          user.location,
+          player.position,
+          team?.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!searchable.includes(search)) return false;
+      }
       return true;
     });
 
     return filtered
-      .map(({ player, user }) => ({
+      .map(({ player, team, user }) => ({
         ...player,
         user: user
           ? {
@@ -125,6 +183,7 @@ export const searchAthletesAdvanced = query({
               age: user.age,
             }
           : null,
+        team,
       }))
       .slice(0, args.limit || 50);
   },
@@ -132,6 +191,7 @@ export const searchAthletesAdvanced = query({
 
 export const createScoutReport = mutation({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     athleteId: v.id("users"),
     content: v.string(),
     rating: v.optional(v.number()),
@@ -140,15 +200,7 @@ export const createScoutReport = mutation({
     weaknesses: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const scout = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email!))
-      .first();
+    const scout = await requireSessionUser(ctx, args.sessionUserId);
 
     if (scout?.role !== "SCOUT") {
       throw new Error("Only scouts can create reports");
@@ -156,6 +208,13 @@ export const createScoutReport = mutation({
 
     const athlete = await ctx.db.get(args.athleteId);
     if (!athlete) {
+      throw new Error("Athlete not found");
+    }
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_userId", (q) => q.eq("userId", args.athleteId))
+      .first();
+    if (!player) {
       throw new Error("Athlete not found");
     }
 
@@ -170,18 +229,33 @@ export const createScoutReport = mutation({
       createdAt: Date.now(),
     });
 
+    const existingObserved = await ctx.db
+      .query("scoutObservedAthletes")
+      .withIndex("by_scoutId", (q) => q.eq("scoutId", scout._id))
+      .filter((q) => q.eq(q.field("athleteId"), args.athleteId))
+      .first();
+
+    if (!existingObserved) {
+      await ctx.db.insert("scoutObservedAthletes", {
+        scoutId: scout._id,
+        athleteId: args.athleteId,
+        createdAt: Date.now(),
+      });
+    }
+
     return { success: true, reportId };
   },
 });
 
 export const getScoutReports = query({
   args: {
+    sessionUserId: v.optional(v.id("users")),
     athleteId: v.optional(v.id("users")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
+    if (!currentUser) {
       throw new Error("Not authenticated");
     }
 
@@ -189,11 +263,42 @@ export const getScoutReports = query({
 
     if (args.athleteId) {
       reports = reports.filter((r) => r.athleteId === args.athleteId);
+    } else if (currentUser?.role === "SCOUT") {
+      reports = reports.filter((r) => r.scoutId === currentUser._id);
+    } else {
+      reports = [];
     }
 
     reports.sort((a, b) => b.createdAt - a.createdAt);
 
-    return reports.slice(0, args.limit || 50);
+    const limitedReports = reports.slice(0, args.limit || 50);
+
+    return await Promise.all(
+      limitedReports.map(async (report) => {
+        const [athlete, scout] = await Promise.all([
+          ctx.db.get(report.athleteId),
+          ctx.db.get(report.scoutId),
+        ]);
+
+        return {
+          ...report,
+          athlete: athlete
+            ? {
+                _id: athlete._id,
+                full_name: athlete.full_name || athlete.name,
+                avatar: athlete.avatar,
+                location: athlete.location,
+              }
+            : null,
+          scout: scout
+            ? {
+                _id: scout._id,
+                full_name: scout.full_name || scout.name,
+              }
+            : null,
+        };
+      }),
+    );
   },
 });
 

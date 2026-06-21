@@ -537,7 +537,7 @@ export const getUserProfileView = query({
     const currentUser = await resolveSessionUser(ctx, args.sessionUserId);
     const targetUser = await ctx.db.get(args.userId);
     if (!targetUser) {
-      throw new Error("User not found");
+      return null;
     }
 
     const follow = currentUser

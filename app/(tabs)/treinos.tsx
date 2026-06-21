@@ -1,4 +1,5 @@
 import { api } from "@/utils/apiClient";
+import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import type { Doc, Id } from "@/utils/apiTypes";
 import { DateTimeField, FormErrorText } from "@/components/FormFields";
 import useAuth from "@/hooks/useAuth";
@@ -6,6 +7,7 @@ import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@/hooks/useApi";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   futureDateTime,
@@ -81,9 +83,14 @@ function WorkoutTextInput({
 export default function Treinos() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
+  const convexUser = useQuery(
+    api.users.getCurrentUser,
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
+  );
   const workoutsQuery = useQuery(
     api.workouts.getWorkouts,
-    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
+    convexUser?.role === "PLAYER" ? { sessionUserId: convexUser._id } : "skip",
   );
   const visibleWorkouts = useMemo(() => {
     const workouts: Workout[] = workoutsQuery ?? [];
@@ -109,6 +116,11 @@ export default function Treinos() {
     const interval = setInterval(() => setTimer((current) => current + 1), 1000);
     return () => clearInterval(interval);
   }, [activeWorkout]);
+
+  useEffect(() => {
+    if (!convexUser || convexUser.role === "PLAYER") return;
+    router.replace(convexUser.role === "COACH" ? "/jogos" : "/dashboard");
+  }, [convexUser, router]);
 
   const groupedWorkouts = {
     scheduled: visibleWorkouts.filter((workout) => workout.status === "scheduled"),
@@ -155,7 +167,7 @@ export default function Treinos() {
   };
 
   const handleCreateWorkout = async () => {
-    if (!user) return;
+    if (!convexUser || convexUser.role !== "PLAYER") return;
     const nextErrors: ValidationErrors<WorkoutField> = {
       name: requiredText(form.name, "Nome"),
       description: optionalText(form.description, "Descrição"),
@@ -174,7 +186,7 @@ export default function Treinos() {
 
     try {
       await createWorkout({
-        sessionUserId: user.id as Id<"users">,
+        sessionUserId: convexUser._id,
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         exercises: [],
@@ -185,30 +197,30 @@ export default function Treinos() {
       resetCreateModal();
       Alert.alert("Sucesso", "Treino criado.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao criar treino.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao criar treino."));
     }
   };
 
   const handleStartWorkout = async (workout: Workout) => {
-    if (!user) return;
+    if (!convexUser || convexUser.role !== "PLAYER") return;
     try {
       await startWorkout({
-        sessionUserId: user.id as Id<"users">,
+        sessionUserId: convexUser._id,
         workoutId: workout._id,
       });
       setActiveWorkout(workout);
       setTimer(0);
       setCompletionNotes("");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao iniciar treino.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao iniciar treino."));
     }
   };
 
   const handleCompleteWorkout = async () => {
-    if (!user || !activeWorkout) return;
+    if (!convexUser || convexUser.role !== "PLAYER" || !activeWorkout) return;
     try {
       await completeWorkout({
-        sessionUserId: user.id as Id<"users">,
+        sessionUserId: convexUser._id,
         workoutId: activeWorkout._id,
         actualDuration: Math.max(1, Math.round(timer / 60)),
         notes: completionNotes.trim() || undefined,
@@ -218,7 +230,7 @@ export default function Treinos() {
       setCompletionNotes("");
       Alert.alert("Sucesso", "Treino concluído.");
     } catch (error) {
-      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao concluir treino.");
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao concluir treino."));
     }
   };
 
@@ -351,6 +363,10 @@ export default function Treinos() {
       ) : null}
     </View>
   );
+
+  if (!convexUser || convexUser.role !== "PLAYER") {
+    return null;
+  }
 
   if (activeWorkout) {
     return (

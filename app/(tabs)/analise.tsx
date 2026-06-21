@@ -2,10 +2,12 @@ import { api } from "@/utils/apiClient";
 import useAuth from "@/hooks/useAuth";
 import useTheme from "@/hooks/useTheme";
 import { useQuery } from "@/hooks/useApi";
+import type { Id } from "@/utils/apiTypes";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StatusBar,
   Text,
@@ -15,6 +17,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type PerformancePeriod = "week" | "month" | "quarter";
+
+type PerformanceAthlete = {
+  id: Id<"users">;
+  name: string;
+  position: string;
+  weeklyFrequency: number;
+  monthlyFrequency: number;
+  quarterlyFrequency: number;
+  totalWorkouts: number;
+  currentStreak: number;
+  bestStreak: number;
+  progressScore: number;
+};
 
 function getPeriodLabel(period: PerformancePeriod) {
   switch (period) {
@@ -32,60 +47,26 @@ export default function Analise() {
   const { user } = useAuth();
   const convexUser = useQuery(
     api.users.getCurrentUser,
-    user ? { sessionUserId: user.id as any } : "skip",
+    user ? { sessionUserId: user.id as Id<"users"> } : "skip",
   );
-
-  // Dummy data for analysis - in real implementation, this would come from queries
-  const performanceData = [
-    {
-      id: "athlete1",
-      name: "João Silva",
-      position: "Avançado",
-      weeklyFrequency: 4,
-      monthlyFrequency: 16,
-      totalWorkouts: 45,
-      currentStreak: 7,
-      bestStreak: 21,
-      progressScore: 85,
-    },
-    {
-      id: "athlete2",
-      name: "Pedro Santos", 
-      position: "Médio",
-      weeklyFrequency: 2,
-      monthlyFrequency: 8,
-      totalWorkouts: 28,
-      currentStreak: 0,
-      bestStreak: 12,
-      progressScore: 65,
-    },
-    {
-      id: "athlete3",
-      name: "Carlos Costa",
-      position: "Defesa", 
-      weeklyFrequency: 5,
-      monthlyFrequency: 20,
-      totalWorkouts: 52,
-      currentStreak: 14,
-      bestStreak: 28,
-      progressScore: 92,
-    },
-    {
-      id: "athlete4",
-      name: "Miguel Fernandes",
-      position: "Guarda-Redes",
-      weeklyFrequency: 3,
-      monthlyFrequency: 12,
-      totalWorkouts: 38,
-      currentStreak: 3,
-      bestStreak: 15,
-      progressScore: 78,
-    },
-  ];
-
+  const performanceQuery = useQuery(
+    api.teams.getTeamPerformanceAnalysis,
+    convexUser?.role === "COACH" ? { sessionUserId: convexUser._id } : "skip",
+  );
+  const performanceData = (performanceQuery ?? []) as PerformanceAthlete[];
   const [selectedPeriod, setSelectedPeriod] = useState<PerformancePeriod>("month");
 
-  // Only show for COACH role
+  if (user && convexUser === undefined) {
+    return (
+      <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
+        <StatusBar barStyle={colors.statusBarStyle} />
+        <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <ActivityIndicator color={colors.primary} />
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
   if (convexUser?.role !== "COACH") {
     return (
       <LinearGradient colors={colors.gradients.background} style={{ flex: 1 }}>
@@ -115,7 +96,19 @@ export default function Analise() {
     return "Necessita Melhoria";
   };
 
-  const renderAthleteCard = (athlete: any) => (
+  const getFrequencyForPeriod = (athlete: PerformanceAthlete) => {
+    if (selectedPeriod === "week") return athlete.weeklyFrequency;
+    if (selectedPeriod === "quarter") return athlete.quarterlyFrequency;
+    return athlete.monthlyFrequency;
+  };
+
+  const getPeriodUnit = () => {
+    if (selectedPeriod === "week") return "sem";
+    if (selectedPeriod === "quarter") return "trim";
+    return "mês";
+  };
+
+  const renderAthleteCard = (athlete: PerformanceAthlete) => (
     <View
       key={athlete.id}
       style={{
@@ -150,12 +143,11 @@ export default function Analise() {
         </View>
       </View>
 
-      {/* Performance Metrics */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
         <View style={{ alignItems: "center" }}>
           <Ionicons name="calendar" size={16} color={colors.primary} />
           <Text style={{ color: colors.text, marginLeft: 4, fontSize: 14 }}>
-            {selectedPeriod === "week" ? athlete.weeklyFrequency : athlete.monthlyFrequency}x/{selectedPeriod === "week" ? "sem" : "mês"}
+            {getFrequencyForPeriod(athlete)}x/{getPeriodUnit()}
           </Text>
         </View>
         <View style={{ alignItems: "center" }}>
@@ -167,12 +159,11 @@ export default function Analise() {
         <View style={{ alignItems: "center" }}>
           <Ionicons name="flame" size={16} color={colors.warning} />
           <Text style={{ color: colors.text, marginLeft: 4, fontSize: 14 }}>
-            🔥 {athlete.currentStreak}
+            {athlete.currentStreak}
           </Text>
         </View>
       </View>
 
-      {/* Progress Bar */}
       <View style={{ marginTop: 8 }}>
         <View
           style={{
@@ -198,9 +189,20 @@ export default function Analise() {
     </View>
   );
 
-  const averageScore = Math.round(
-    performanceData.reduce((sum, athlete) => sum + athlete.progressScore, 0) / performanceData.length
-  );
+  const averageScore =
+    performanceData.length > 0
+      ? Math.round(
+          performanceData.reduce((sum, athlete) => sum + athlete.progressScore, 0) /
+            performanceData.length,
+        )
+      : 0;
+  const averageFrequency =
+    performanceData.length > 0
+      ? Math.round(
+          performanceData.reduce((sum, athlete) => sum + getFrequencyForPeriod(athlete), 0) /
+            performanceData.length,
+        )
+      : 0;
   const sortedPerformanceData = [...performanceData].sort(
     (a, b) => b.progressScore - a.progressScore,
   );
@@ -210,7 +212,6 @@ export default function Analise() {
       <StatusBar barStyle={colors.statusBarStyle} />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1, padding: 20 }}>
-          {/* Header */}
           <View style={{ marginBottom: 24 }}>
             <Text
               style={{
@@ -226,9 +227,8 @@ export default function Analise() {
             </Text>
           </View>
 
-          {/* Period Selector */}
           <View style={{ flexDirection: "row", marginBottom: 24 }}>
-            {["week" as const, "month" as const, "quarter" as const].map((period) => (
+            {(["week", "month", "quarter"] as const).map((period) => (
               <TouchableOpacity
                 key={period}
                 style={{
@@ -255,7 +255,6 @@ export default function Analise() {
             ))}
           </View>
 
-          {/* Team Overview */}
           <View
             style={{
               backgroundColor: colors.surface,
@@ -276,7 +275,7 @@ export default function Analise() {
               </View>
               <View style={{ alignItems: "center" }}>
                 <Text style={{ color: colors.success, fontSize: 24, fontWeight: "bold" }}>
-                  {Math.round(performanceData.reduce((sum, a) => sum + a.weeklyFrequency, 0) / performanceData.length)}
+                  {averageFrequency}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>Freq. Média</Text>
               </View>
@@ -289,7 +288,6 @@ export default function Analise() {
             </View>
           </View>
 
-          {/* Performance Categories */}
           <View style={{ flexDirection: "row", marginBottom: 24 }}>
             <View style={{ flex: 1, marginRight: 8 }}>
               <View
@@ -302,7 +300,7 @@ export default function Analise() {
               >
                 <Ionicons name="trending-up" size={32} color={colors.success} />
                 <Text style={{ color: colors.text, fontSize: 20, fontWeight: "bold", marginTop: 8 }}>
-                  {performanceData.filter(a => a.progressScore >= 80).length}
+                  {performanceData.filter((a) => a.progressScore >= 80).length}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>Excelentes</Text>
               </View>
@@ -318,7 +316,7 @@ export default function Analise() {
               >
                 <Ionicons name="trending-up" size={32} color={colors.warning} />
                 <Text style={{ color: colors.text, fontSize: 20, fontWeight: "bold", marginTop: 8 }}>
-                  {performanceData.filter(a => a.progressScore >= 60 && a.progressScore < 80).length}
+                  {performanceData.filter((a) => a.progressScore >= 60 && a.progressScore < 80).length}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>Bons</Text>
               </View>
@@ -334,19 +332,48 @@ export default function Analise() {
               >
                 <Ionicons name="trending-down" size={32} color={colors.danger} />
                 <Text style={{ color: colors.text, fontSize: 20, fontWeight: "bold", marginTop: 8 }}>
-                  {performanceData.filter(a => a.progressScore < 60).length}
+                  {performanceData.filter((a) => a.progressScore < 60).length}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>Melhorar</Text>
               </View>
             </View>
           </View>
 
-          {/* Athletes Performance List */}
           <View>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
               Desempenho Individual
             </Text>
-            {sortedPerformanceData.map(renderAthleteCard)}
+            {performanceQuery === undefined ? (
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  borderRadius: 12,
+                  padding: 24,
+                  alignItems: "center",
+                }}
+              >
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : sortedPerformanceData.length > 0 ? (
+              sortedPerformanceData.map(renderAthleteCard)
+            ) : (
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  borderRadius: 12,
+                  padding: 24,
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons name="people-outline" size={40} color={colors.textMuted} />
+                <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 12 }}>
+                  Sem atletas para analisar
+                </Text>
+                <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 6 }}>
+                  Associa atletas à tua equipa para veres dados de desempenho.
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>

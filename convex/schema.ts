@@ -305,6 +305,14 @@ export default defineSchema({
     .index("by_scoutId", ["scoutId"])
     .index("by_athleteId", ["athleteId"]),
 
+  scoutObservedAthletes: defineTable({
+    scoutId: v.id("users"),
+    athleteId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_scoutId", ["scoutId"])
+    .index("by_athleteId", ["athleteId"]),
+
   // Coach Invites
   invites: defineTable({
     coachId: v.id("users"),
