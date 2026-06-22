@@ -4,6 +4,14 @@ import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 import { cleanOptionalText, cleanText } from "./validation";
 
 const emptyTeamStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+const defaultPlayerStats = {
+  gamesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  points: 0,
+  assists: 0,
+  rebounds: 0,
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -307,6 +315,7 @@ export const searchAvailableAthletes = query({
       .withIndex("by_coachId", (q) => q.eq("coachId", coach._id))
       .collect();
     const inviteByAthlete = new Map(invites.map((invite) => [invite.athleteId, invite]));
+    const playerByUserId = new Map(players.map((player) => [player.userId, player]));
 
     const results = [];
     for (const player of players) {
@@ -342,6 +351,45 @@ export const searchAvailableAthletes = query({
       });
 
       if (results.length >= limit) break;
+    }
+
+    if (results.length < limit) {
+      const playerUsers = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "PLAYER"))
+        .collect();
+
+      for (const athleteUser of playerUsers) {
+        if (playerByUserId.has(athleteUser._id)) continue;
+        if (athleteUser.is_public === false) continue;
+
+        const searchable = normalizeSearchText(
+          [
+            athleteUser.full_name,
+            athleteUser.name,
+            athleteUser.email,
+            athleteUser.bio,
+            athleteUser.location,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        );
+
+        if (!searchable.includes(search)) continue;
+        const invite = inviteByAthlete.get(athleteUser._id);
+        results.push({
+          athleteId: athleteUser._id,
+          full_name: athleteUser.full_name || athleteUser.name || athleteUser.email || "Atleta",
+          email: athleteUser.email,
+          avatar: athleteUser.avatar,
+          bio: athleteUser.bio,
+          position: undefined,
+          teamId: undefined,
+          inviteStatus: invite?.status,
+        });
+
+        if (results.length >= limit) break;
+      }
     }
 
     return results;
@@ -474,7 +522,21 @@ export const addAthleteToTeam = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", args.athleteId))
       .first();
     if (playerProfile) {
-      await ctx.db.patch(playerProfile._id, { teamId: args.teamId });
+      await ctx.db.patch(playerProfile._id, {
+        coachId: team.coachId,
+        teamId: args.teamId,
+      });
+    } else {
+      const athlete = await ctx.db.get(args.athleteId);
+      if (!athlete || athlete.role !== "PLAYER") {
+        throw new Error("Athlete not found");
+      }
+      await ctx.db.insert("players", {
+        userId: args.athleteId,
+        coachId: team.coachId,
+        teamId: args.teamId,
+        stats: defaultPlayerStats,
+      });
     }
 
     return { success: true };
@@ -500,7 +562,7 @@ export const removeAthleteFromTeam = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", args.athleteId))
       .first();
     if (playerProfile) {
-      await ctx.db.patch(playerProfile._id, { teamId: undefined });
+      await ctx.db.patch(playerProfile._id, { coachId: undefined, teamId: undefined });
     }
 
     return { success: true };

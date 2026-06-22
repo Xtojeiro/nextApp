@@ -2,6 +2,15 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser } from "./authHelpers";
 
+const defaultPlayerStats = {
+  gamesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  points: 0,
+  assists: 0,
+  rebounds: 0,
+};
+
 export const createInvite = mutation({
   args: {
     sessionUserId: v.id("users"),
@@ -157,6 +166,13 @@ export const respondToInvite = mutation({
         await ctx.db.patch(playerProfile._id, {
           coachId: invite.coachId,
           teamId: coachProfile.teamId,
+        });
+      } else if (coachProfile) {
+        await ctx.db.insert("players", {
+          userId: user._id,
+          coachId: invite.coachId,
+          teamId: coachProfile.teamId,
+          stats: defaultPlayerStats,
         });
       }
     }
