@@ -2,6 +2,13 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSessionUser, resolveSessionUser } from "./authHelpers";
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export const getObservedAthletes = query({
   args: {
     sessionUserId: v.optional(v.id("users")),
@@ -147,14 +154,25 @@ export const searchAthletesAdvanced = query({
       }),
     );
 
+    const normalizedQuery = args.query?.trim()
+      ? normalizeSearchText(args.query.trim())
+      : "";
+    const normalizedLocation = args.location?.trim()
+      ? normalizeSearchText(args.location.trim())
+      : "";
+
     let filtered = users.filter(({ player, team, user }) => {
       if (!user) return false;
+      if (user.role !== "PLAYER") return false;
       if (args.minAge !== undefined && (user.age || 0) < args.minAge) return false;
       if (args.maxAge !== undefined && (user.age || 0) > args.maxAge) return false;
-      if (args.location && !user.location?.toLowerCase().includes(args.location.toLowerCase()))
+      if (
+        normalizedLocation &&
+        !normalizeSearchText(user.location || "").includes(normalizedLocation)
+      ) {
         return false;
-      if (args.query?.trim()) {
-        const search = args.query.trim().toLowerCase();
+      }
+      if (normalizedQuery) {
         const searchable = [
           user.full_name,
           user.name,
@@ -165,8 +183,7 @@ export const searchAthletesAdvanced = query({
         ]
           .filter(Boolean)
           .join(" ")
-          .toLowerCase();
-        if (!searchable.includes(search)) return false;
+        if (!normalizeSearchText(searchable).includes(normalizedQuery)) return false;
       }
       return true;
     });

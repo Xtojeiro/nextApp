@@ -5,6 +5,14 @@ import { assertPositiveInteger, cleanOptionalText, cleanText } from "./validatio
 import { Scrypt } from "lucia";
 
 const PASSWORD_MIN_LENGTH = 8;
+const defaultPlayerStats = {
+  gamesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  points: 0,
+  assists: 0,
+  rebounds: 0,
+};
 
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -47,6 +55,35 @@ function normalizeRole(role: string): "PLAYER" | "COACH" | "SCOUT" {
   if (role === "athlete" || role === "PLAYER") return "PLAYER";
   if (role === "coach" || role === "COACH") return "COACH";
   return "SCOUT";
+}
+
+async function ensureRoleProfile(ctx: any, user: any) {
+  if (user.role === "PLAYER") {
+    const existingPlayer = await ctx.db
+      .query("players")
+      .withIndex("by_userId", (q: any) => q.eq("userId", user._id))
+      .first();
+    if (!existingPlayer) {
+      await ctx.db.insert("players", {
+        userId: user._id,
+        stats: defaultPlayerStats,
+      });
+      return "player";
+    }
+  }
+
+  if (user.role === "COACH") {
+    const existingCoach = await ctx.db
+      .query("coaches")
+      .withIndex("by_userId", (q: any) => q.eq("userId", user._id))
+      .first();
+    if (!existingCoach) {
+      await ctx.db.insert("coaches", { userId: user._id });
+      return "coach";
+    }
+  }
+
+  return null;
 }
 
 async function deleteByIndex(ctx: any, table: string, index: string, field: string, value: any) {
@@ -209,6 +246,72 @@ export const getCurrentUser = query({
   },
 });
 
+export const isEmailAvailable = query({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const email = sanitizeString(args.email).toLowerCase();
+    if (!isValidEmail(email)) {
+      throw new Error("Invalid email format");
+    }
+
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .first();
+
+    return existingUser === null;
+  },
+});
+
+export const auditDuplicateEmails = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const usersByEmail = new Map<string, any[]>();
+
+    for (const user of users) {
+      const email = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
+      if (!email) continue;
+      usersByEmail.set(email, [...(usersByEmail.get(email) || []), user]);
+    }
+
+    return Array.from(usersByEmail.entries())
+      .filter(([, emailUsers]) => emailUsers.length > 1)
+      .map(([email, emailUsers]) => ({
+        email,
+        count: emailUsers.length,
+        users: emailUsers.map((user) => ({
+          _id: user._id,
+          full_name: user.full_name || user.name,
+          role: user.role,
+          created_at: user.created_at,
+        })),
+      }));
+  },
+});
+
+export const repairMissingRoleProfiles = mutation({
+  args: {
+    sessionUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    await requireSessionUser(ctx, args.sessionUserId);
+    const users = await ctx.db.query("users").collect();
+    let playersCreated = 0;
+    let coachesCreated = 0;
+
+    for (const user of users) {
+      const created = await ensureRoleProfile(ctx, user);
+      if (created === "player") playersCreated += 1;
+      if (created === "coach") coachesCreated += 1;
+    }
+
+    return { success: true, playersCreated, coachesCreated };
+  },
+});
+
 export const ensureUserProfile = mutation({
   args: {
     fullName: v.optional(v.string()),
@@ -238,14 +341,7 @@ export const ensureUserProfile = mutation({
       if (!existingPlayer) {
         await ctx.db.insert("players", {
           userId: user._id,
-          stats: {
-            gamesPlayed: 0,
-            wins: 0,
-            losses: 0,
-            points: 0,
-            assists: 0,
-            rebounds: 0,
-          },
+          stats: defaultPlayerStats,
         });
       }
     }
@@ -312,7 +408,7 @@ export const registerUser = mutation({
       .first();
 
     if (existingUser) {
-      throw new Error("User already exists");
+      throw new Error("Email already in use");
     }
 
     const passwordHash = await hashPassword(args.password);
@@ -340,14 +436,7 @@ export const registerUser = mutation({
         userId,
         teamId: undefined,
         position: undefined,
-        stats: {
-          gamesPlayed: 0,
-          wins: 0,
-          losses: 0,
-          points: 0,
-          assists: 0,
-          rebounds: 0,
-        },
+        stats: defaultPlayerStats,
       });
     } else if (normalizedRole === "COACH") {
       await ctx.db.insert("coaches", {
@@ -596,7 +685,7 @@ export const getUserProfileView = query({
         if (!game) return null;
         const [team1, team2] = await Promise.all([
           ctx.db.get(game.team1Id),
-          ctx.db.get(game.team2Id),
+          game.team2Id ? ctx.db.get(game.team2Id) : null,
         ]);
         return { ...game, team1, team2, playerStats: stat };
       }),
@@ -611,7 +700,7 @@ export const getUserProfileView = query({
         teamGames.map(async (game) => {
           const [team1, team2] = await Promise.all([
             ctx.db.get(game.team1Id),
-            ctx.db.get(game.team2Id),
+            game.team2Id ? ctx.db.get(game.team2Id) : null,
           ]);
           return { ...game, team1, team2, playerStats: null };
         }),
@@ -754,14 +843,7 @@ export const getPlayerStats = query({
     if (!targetUserId) {
       const user = await resolveSessionUser(ctx, args.sessionUserId);
       if (!user) {
-        return {
-          gamesPlayed: 0,
-          wins: 0,
-          losses: 0,
-          points: 0,
-          assists: 0,
-          rebounds: 0,
-        };
+        return defaultPlayerStats;
       }
       targetUserId = user._id;
     }
@@ -772,14 +854,7 @@ export const getPlayerStats = query({
       .first();
 
     return (
-      player?.stats || {
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        points: 0,
-        assists: 0,
-        rebounds: 0,
-      }
+      player?.stats || defaultPlayerStats
     );
   },
 });

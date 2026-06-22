@@ -11,9 +11,9 @@ import {
 async function getGameTeams(ctx: any, game: any) {
   const [team1, team2] = await Promise.all([
     ctx.db.get(game.team1Id),
-    ctx.db.get(game.team2Id),
+    game.team2Id ? ctx.db.get(game.team2Id) : null,
   ]);
-  if (!team1 || !team2) {
+  if (!team1 || (game.team2Id && !team2)) {
     throw new Error("One or both teams not found");
   }
   return { team1, team2 };
@@ -21,12 +21,12 @@ async function getGameTeams(ctx: any, game: any) {
 
 function getCoachTeamSide(userId: any, team1: any, team2: any) {
   if (team1.coachId === userId) return "team1";
-  if (team2.coachId === userId) return "team2";
+  if (team2?.coachId === userId) return "team2";
   return null;
 }
 
 function getOpponentCoachId(coachSide: "team1" | "team2", team1: any, team2: any) {
-  return coachSide === "team1" ? team2.coachId : team1.coachId;
+  return coachSide === "team1" ? team2?.coachId : team1.coachId;
 }
 
 export const getGames = query({
@@ -64,7 +64,7 @@ export const getGames = query({
       games.slice(0, args.limit || 50).map(async (game) => {
         const [team1, team2, creator] = await Promise.all([
           ctx.db.get(game.team1Id),
-          ctx.db.get(game.team2Id),
+          game.team2Id ? ctx.db.get(game.team2Id) : null,
           ctx.db.get(game.createdBy),
         ]);
 
@@ -89,7 +89,8 @@ export const createGame = mutation({
     sessionUserId: v.id("users"),
     name: v.string(),
     team1Id: v.id("teams"),
-    team2Id: v.id("teams"),
+    team2Id: v.optional(v.id("teams")),
+    opponentName: v.optional(v.string()),
     date: v.number(),
     location: v.string(),
     notes: v.optional(v.string()),
@@ -98,15 +99,21 @@ export const createGame = mutation({
     const user = await requireSessionUser(ctx, args.sessionUserId);
     const [team1, team2] = await Promise.all([
       ctx.db.get(args.team1Id),
-      ctx.db.get(args.team2Id),
+      args.team2Id ? ctx.db.get(args.team2Id) : null,
     ]);
 
-    if (!team1 || !team2) {
+    if (!team1 || (args.team2Id && !team2)) {
       throw new Error("One or both teams not found");
     }
-    if (args.team1Id === args.team2Id) {
+    if (team1.coachId !== user._id) {
+      throw new Error("Not authorized to create games for this team");
+    }
+    if (args.team2Id && args.team1Id === args.team2Id) {
       throw new Error("Teams must be different");
     }
+    const opponentName = args.team2Id
+      ? undefined
+      : cleanText(args.opponentName || "", "Opponent name", 120);
     assertFutureTimestamp(args.date, "Game date");
 
     const now = Date.now();
@@ -114,6 +121,7 @@ export const createGame = mutation({
       name: cleanText(args.name, "Game name"),
       team1Id: args.team1Id,
       team2Id: args.team2Id,
+      opponentName,
       date: args.date,
       location: cleanText(args.location, "Location", 120),
       status: "scheduled",
@@ -191,17 +199,33 @@ export const updateGame = mutation({
         throw new Error("Both scores are required to submit a completed result");
       }
 
-      delete updateData.status;
-      updateData.pendingScore1 = score1;
-      updateData.pendingScore2 = score2;
-      updateData.pendingStatus = "completed";
-      updateData.resultStatus = "pending_approval";
-      updateData.submittedBy = user._id;
-      updateData.submittedAt = Date.now();
-      updateData.approvedBy = undefined;
-      updateData.approvedAt = undefined;
-      updateData.rejectedBy = undefined;
-      updateData.rejectedAt = undefined;
+      if (team2) {
+        delete updateData.status;
+        updateData.pendingScore1 = score1;
+        updateData.pendingScore2 = score2;
+        updateData.pendingStatus = "completed";
+        updateData.resultStatus = "pending_approval";
+        updateData.submittedBy = user._id;
+        updateData.submittedAt = Date.now();
+        updateData.approvedBy = undefined;
+        updateData.approvedAt = undefined;
+        updateData.rejectedBy = undefined;
+        updateData.rejectedAt = undefined;
+      } else {
+        updateData.status = "completed";
+        updateData.score1 = score1;
+        updateData.score2 = score2;
+        updateData.resultStatus = "approved";
+        updateData.submittedBy = user._id;
+        updateData.submittedAt = Date.now();
+        updateData.approvedBy = user._id;
+        updateData.approvedAt = Date.now();
+        updateData.rejectedBy = undefined;
+        updateData.rejectedAt = undefined;
+        updateData.pendingScore1 = undefined;
+        updateData.pendingScore2 = undefined;
+        updateData.pendingStatus = undefined;
+      }
     } else {
       if (args.score1 !== undefined) updateData.score1 = score1;
       if (args.score2 !== undefined) updateData.score2 = score2;
@@ -238,7 +262,7 @@ export const approveGameResult = mutation({
     if (!submitterSide) {
       throw new Error("Submitting coach is not linked to this game");
     }
-    if (getOpponentCoachId(submitterSide, team1, team2) !== user._id) {
+    if (!team2 || getOpponentCoachId(submitterSide, team1, team2) !== user._id) {
       throw new Error("Only the opposing coach can approve this result");
     }
 
@@ -282,7 +306,7 @@ export const rejectGameResult = mutation({
     if (!submitterSide) {
       throw new Error("Submitting coach is not linked to this game");
     }
-    if (getOpponentCoachId(submitterSide, team1, team2) !== user._id) {
+    if (!team2 || getOpponentCoachId(submitterSide, team1, team2) !== user._id) {
       throw new Error("Only the opposing coach can reject this result");
     }
 
@@ -318,7 +342,7 @@ export const deleteGame = mutation({
     if (!hasPermission) {
       const [team1, team2] = await Promise.all([
         ctx.db.get(game.team1Id),
-        ctx.db.get(game.team2Id),
+        game.team2Id ? ctx.db.get(game.team2Id) : null,
       ]);
       if ((team1 && team1.coachId === user._id) || (team2 && team2.coachId === user._id)) {
         hasPermission = true;
@@ -370,7 +394,7 @@ export const getMyTeamGames = query({
       userGames.slice(0, args.limit || 50).map(async (game) => {
         const [team1, team2] = await Promise.all([
           ctx.db.get(game.team1Id),
-          ctx.db.get(game.team2Id),
+          game.team2Id ? ctx.db.get(game.team2Id) : null,
         ]);
         return {
           ...game,

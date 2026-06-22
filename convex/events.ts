@@ -23,6 +23,7 @@ type SyncedTrainingEvent = {
   user_id: Id<"users">;
   notes?: string;
   created_at: number;
+  updated_at?: number;
 };
 
 function getEventDurationMinutes(event: SyncedTrainingEvent) {
@@ -108,7 +109,9 @@ export const getEvents = query({
     if (args.endDate) events = events.filter((event) => event.date <= args.endDate!);
     if (args.type) events = events.filter((event) => event.type === args.type);
 
-    events.sort((a, b) => a.date.localeCompare(b.date));
+    events.sort((a, b) =>
+      `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`),
+    );
     return events;
   },
 });
@@ -133,6 +136,7 @@ export const createEvent = mutation({
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionUserId);
     assertEventSchedule(args.date, args.start_time, args.end_time);
+    const now = Date.now();
     const eventData = {
       title: cleanText(args.title, "Title"),
       description: cleanOptionalText(args.description, "Description"),
@@ -143,7 +147,8 @@ export const createEvent = mutation({
       type: args.type,
       user_id: user._id,
       notes: cleanOptionalText(args.notes, "Notes"),
-      created_at: Date.now(),
+      created_at: now,
+      updated_at: now,
     };
     const eventId = await ctx.db.insert("events", eventData);
 
@@ -187,7 +192,7 @@ export const updateEvent = mutation({
       allowPast: originalStart.getTime() < Date.now(),
     });
 
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, any> = { updated_at: Date.now() };
     if (args.title !== undefined) updateData.title = cleanText(args.title, "Title");
     if (args.description !== undefined) updateData.description = cleanOptionalText(args.description, "Description");
     if (args.date !== undefined) updateData.date = args.date;
@@ -251,7 +256,9 @@ export const getTeamEvents = query({
     events = events.filter((event) => playerUserIds.has(event.user_id));
     if (args.startDate) events = events.filter((event) => event.date >= args.startDate!);
     if (args.endDate) events = events.filter((event) => event.date <= args.endDate!);
-    events.sort((a, b) => a.date.localeCompare(b.date));
+    events.sort((a, b) =>
+      `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`),
+    );
 
     return events;
   },

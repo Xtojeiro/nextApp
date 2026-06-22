@@ -2,7 +2,7 @@ import { api } from "@/utils/apiClient";
 import { getSimpleErrorMessage } from "@/utils/errorMessages";
 import { AccountType, ROLE_TO_ACCOUNT_TYPE } from "@/types/user";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import {
   createContext,
   ReactNode,
@@ -76,6 +76,7 @@ function mapConvexUser(convexUser: any): User | null {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
   const { signIn, signOut } = useAuthActions();
+  const convex = useConvex();
   const convexUser = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -116,8 +117,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const emailAvailable = await convex.query(api.users.isEmailAvailable, {
+        email: normalizedEmail,
+      });
+      if (!emailAvailable) {
+        const message = "Este email ja esta associado a uma conta.";
+        setAuthError(message);
+        return { ok: false, error: message };
+      }
+
       await signIn("password", {
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
         name: fullName.trim(),
         role,
@@ -129,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAuthError(message);
       return { ok: false, error: message };
     }
-  }, [signIn]);
+  }, [convex, signIn]);
 
   const logout = useCallback(async () => {
     await signOut();

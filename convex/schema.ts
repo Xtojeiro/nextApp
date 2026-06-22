@@ -132,7 +132,8 @@ export default defineSchema({
   games: defineTable({
     name: v.string(),
     team1Id: v.id("teams"),
-    team2Id: v.id("teams"),
+    team2Id: v.optional(v.id("teams")),
+    opponentName: v.optional(v.string()),
     date: v.number(),
     location: v.string(),
     status: v.union(
@@ -193,6 +194,7 @@ export default defineSchema({
     user_id: v.id("users"),
     notes: v.optional(v.string()),
     created_at: v.number(),
+    updated_at: v.optional(v.number()),
   })
     .index("by_date", ["date"])
     .index("by_user_id", ["user_id"]),

@@ -8,6 +8,7 @@ const TECHNICAL_ERROR_PATTERNS = [
 ];
 
 const ERROR_MESSAGE_MAP: Array<[RegExp, string]> = [
+  [/Email already in use|email.*already.*use/i, "Este email ja esta associado a uma conta."],
   [/User already exists|already exists|conta .*ja existe|account .*already exists/i, "Esta conta ja existe."],
   [/InvalidSecret|InvalidAccountId|AccountNotFound|Invalid email or password/i, "Email ou palavra-passe incorretos."],
   [/Invalid email format/i, "O email nao e valido."],

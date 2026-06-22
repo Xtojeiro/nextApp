@@ -37,6 +37,7 @@ type GameWithTeams = Doc<"games"> & {
 const emptyCreateForm = {
   name: "",
   opponentTeamId: "" as string,
+  opponentName: "",
   location: "",
   date: null as number | null,
   notes: "",
@@ -169,7 +170,13 @@ export default function Jogos() {
     const nextErrors: ValidationErrors<CreateField> = {
       name: requiredText(createForm.name, "Nome do jogo"),
       location: requiredText(createForm.location, "Local", 120),
-      opponentTeamId: createForm.opponentTeamId ? undefined : "Adversário é obrigatório.",
+      opponentTeamId:
+        createForm.opponentTeamId || createForm.opponentName.trim()
+          ? undefined
+          : "Adversário é obrigatório.",
+      opponentName: createForm.opponentTeamId
+        ? undefined
+        : requiredText(createForm.opponentName, "Nome do adversário", 120),
       date: futureDateTime(createForm.date, "Data do jogo"),
       notes: optionalText(createForm.notes, "Notas"),
     };
@@ -184,7 +191,12 @@ export default function Jogos() {
         sessionUserId: convexUser._id,
         name: createForm.name.trim(),
         team1Id: team._id,
-        team2Id: createForm.opponentTeamId as Id<"teams">,
+        team2Id: createForm.opponentTeamId
+          ? (createForm.opponentTeamId as Id<"teams">)
+          : undefined,
+        opponentName: createForm.opponentTeamId
+          ? undefined
+          : createForm.opponentName.trim(),
         date: createForm.date!,
         location: createForm.location.trim(),
         notes: createForm.notes.trim() || undefined,
@@ -233,7 +245,7 @@ export default function Jogos() {
         score1: editForm.score1 ? Number(editForm.score1) : undefined,
         score2: editForm.score2 ? Number(editForm.score2) : undefined,
       });
-      const submittedForApproval = editForm.status === "completed";
+      const submittedForApproval = editForm.status === "completed" && Boolean(selectedGame.team2Id);
       resetEditForm();
       Alert.alert(
         "Sucesso",
@@ -440,6 +452,33 @@ export default function Jogos() {
               <Text style={{ color: colors.text, marginBottom: 8, fontWeight: "600" }}>
                 Adversário
               </Text>
+              <TextInput
+                value={createForm.opponentName}
+                onChangeText={(text) => {
+                  setCreateForm((current) => ({
+                    ...current,
+                    opponentName: text,
+                    opponentTeamId: "",
+                  }));
+                  setCreateErrors((current) => ({
+                    ...current,
+                    opponentName: undefined,
+                    opponentTeamId: undefined,
+                  }));
+                }}
+                placeholder="Nome do adversário"
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  inputStyle(colors),
+                  errorBorderStyle(colors, createErrors.opponentName || createErrors.opponentTeamId),
+                ]}
+              />
+              <FormErrorText error={createErrors.opponentName || createErrors.opponentTeamId} />
+              {opponentTeams.length > 0 ? (
+                <Text style={{ color: colors.textMuted, marginBottom: 8 }}>
+                  Ou escolhe uma equipa registada
+                </Text>
+              ) : null}
               <View style={{ gap: 8, marginBottom: 16 }}>
                 {opponentTeams.map((opponent: Team) => (
                   <TouchableOpacity
@@ -454,6 +493,7 @@ export default function Jogos() {
                       setCreateForm((current) => ({
                         ...current,
                         opponentTeamId: opponent._id,
+                        opponentName: "",
                       }))
                     }
                   >
@@ -469,7 +509,6 @@ export default function Jogos() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <FormErrorText error={createErrors.opponentTeamId} />
               <TextInput
                 value={createForm.notes}
                 onChangeText={(text) => {
@@ -818,8 +857,10 @@ function formatGameDate(timestamp: number) {
 }
 
 function getOpponentName(game: GameWithTeams, team: Team | null | undefined) {
-  if (!team) return "Equipa";
-  return game.team1Id === team._id ? game.team2?.name : game.team1?.name;
+  if (!team) return game.opponentName || game.team2?.name || "Equipa";
+  return game.team1Id === team._id
+    ? game.team2?.name || game.opponentName || "Adversário"
+    : game.team1?.name || "Equipa";
 }
 
 function isCoachOfGame(userId: Id<"users">, game: GameWithTeams) {
