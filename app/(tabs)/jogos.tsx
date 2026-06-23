@@ -19,6 +19,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   StatusBar,
   Text,
   TextInput,
@@ -256,27 +257,39 @@ export default function Jogos() {
     }
   };
 
+  const performDeleteGame = async (game: GameWithTeams) => {
+    if (!convexUser) return;
+    try {
+      await deleteGame({
+        sessionUserId: convexUser._id,
+        gameId: game._id,
+      });
+      if (selectedGame?._id === game._id) {
+        resetEditForm();
+      }
+      Alert.alert("Sucesso", "Jogo eliminado.");
+    } catch (error) {
+      Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao eliminar jogo."));
+    }
+  };
+
   const handleDeleteGame = (game: GameWithTeams) => {
     if (!convexUser) return;
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(`Queres remover o jogo "${game.name}"?`);
+      if (confirmed) {
+        void performDeleteGame(game);
+      }
+      return;
+    }
+
     Alert.alert("Eliminar jogo", `Queres remover o jogo "${game.name}"?`, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteGame({
-              sessionUserId: convexUser._id,
-              gameId: game._id,
-            });
-            if (selectedGame?._id === game._id) {
-              resetEditForm();
-            }
-            Alert.alert("Sucesso", "Jogo eliminado.");
-          } catch (error) {
-            Alert.alert("Erro", getSimpleErrorMessage(error, "Falha ao eliminar jogo."));
-          }
-        },
+        onPress: () => void performDeleteGame(game),
       },
     ]);
   };
@@ -680,6 +693,22 @@ export default function Jogos() {
                   Guardar alterações
                 </Text>
               </TouchableOpacity>
+              {selectedGame ? (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.danger,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    marginTop: 12,
+                  }}
+                  onPress={() => handleDeleteGame(selectedGame)}
+                >
+                  <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                    Eliminar jogo
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </SafeAreaView>
           </LinearGradient>
         </Modal>
